@@ -350,18 +350,17 @@ async function generateGitStats(options) {
     const sortedDailyStats = Array.from(dailyStats.values())
       .sort((a, b) => new Date(a.date) - new Date(b.date));
     
-    const maxCommits = Math.max(...sortedDailyStats.map(d => d.commits));
     const maxNetChanges = Math.max(...sortedDailyStats.map(d => Math.abs(d.netChanges)));
     
     console.log('┌────────────┬────────┬────────┬─────────────────────────────────────────────────────┐');
-    console.log('│ 日期       │ 提交数 │ 净增行 │ 提交数量分布图                                      │');
+    console.log('│ 日期       │ 提交数 │ 净增行 │ 代码行数分布图                                      │');
     console.log('├────────────┼────────┼────────┼─────────────────────────────────────────────────────┤');
     
     for (const dayStats of sortedDailyStats) {
       const dateStr = dayStats.date;
       const commitsStr = dayStats.commits.toString();
       const netStr = dayStats.netChanges >= 0 ? `+${dayStats.netChanges}` : `${dayStats.netChanges}`;
-      const barChart = drawHorizontalBarChart(dayStats.commits, maxCommits, 45);
+      const barChart = drawHorizontalBarChart(Math.abs(dayStats.netChanges), maxNetChanges, 35);
       const authorCount = dayStats.authors.size;
       const suffix = authorCount > 1 ? ` (${authorCount}人)` : ` (${Array.from(dayStats.authors)[0]})`;
       
@@ -369,7 +368,7 @@ async function generateGitStats(options) {
         '│ ' + dateStr.padEnd(10) + 
         ' │ ' + commitsStr.padStart(6) + 
         ' │ ' + netStr.padStart(6) + 
-        ' │ ' + barChart + suffix.padEnd(8 - suffix.length) + ' │'
+        ' │ ' + (barChart + ' ' + suffix).padEnd(51) + ' │'
       );
     }
     
@@ -378,14 +377,21 @@ async function generateGitStats(options) {
     // 统计汇总
     const totalDays = dailyStats.size;
     const avgCommitsPerDay = (totalCommits / totalDays).toFixed(1);
-    const mostActiveDate = sortedDailyStats.reduce((max, day) => 
+    const avgLinesPerDay = (totalNetChanges / totalDays).toFixed(0);
+    
+    const mostActiveByCommits = sortedDailyStats.reduce((max, day) => 
       day.commits > max.commits ? day : max
+    );
+    const mostActiveByLines = sortedDailyStats.reduce((max, day) => 
+      Math.abs(day.netChanges) > Math.abs(max.netChanges) ? day : max
     );
     
     console.log(`\n📊 活跃度分析:`);
     console.log(`   • 活跃天数: ${totalDays} 天`);
     console.log(`   • 平均每日提交: ${avgCommitsPerDay} 次`);
-    console.log(`   • 最活跃日期: ${mostActiveDate.date} (${mostActiveDate.commits} 次提交)`);
+    console.log(`   • 平均每日代码量: ${avgLinesPerDay} 行`);
+    console.log(`   • 提交最频繁日期: ${mostActiveByCommits.date} (${mostActiveByCommits.commits} 次提交)`);
+    console.log(`   • 代码量最多日期: ${mostActiveByLines.date} (${mostActiveByLines.netChanges >= 0 ? '+' : ''}${mostActiveByLines.netChanges} 行)`);
   }
 
   console.log(`\n✅ 统计完成! 共分析了 ${totalCommits} 个提交记录 (当前分支，纯开发提交)`);
