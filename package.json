@@ -1,7 +1,7 @@
 {
   "name": "local_tools",
   "version": "1.0.0",
-  "description": "本地工具集合",
+  "description": "本地工具集合 - 提供Git统计分析等实用命令行工具",
   "main": "bin/cli.js",
   "bin": {
     "local-tools": "./bin/cli.js"
