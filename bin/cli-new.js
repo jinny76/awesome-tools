@@ -66,6 +66,7 @@ program
   .option('--skip-test', '跳过npm run dev测试验证')
   .option('--include <patterns>', '额外包含的文件模式 (逗号分隔)', '*.ts,*.tsx')
   .option('--exclude <patterns>', '排除的文件模式 (逗号分隔)', 'node_modules/**,dist/**,build/**,*.test.*,*.spec.*')
+  .option('--no-gitignore', '忽略.gitignore文件中的排除规则')
   .option('--debug', '显示详细的调试信息')
   .option('--debug-file <path>', '额外调试特定文件 (相对路径)')
   .action(async (options) => {
