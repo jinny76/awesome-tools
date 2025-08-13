@@ -23,6 +23,9 @@ npm start -- --help
 - `hello --name <name>` - Greeting command
 - `date` - Display current date/time in Chinese locale  
 - `info` - Show system information (Node.js version, OS, architecture)
+- `git-stats [options]` - Git repository commit history analysis with detailed statistics
+- `clean-code -d <path> [options]` - Clean dead code in Vue+Vite projects
+- `debug-file -d <path> -f <file>` - Debug why a specific file is marked as dead code
 
 ## Architecture
 
@@ -58,10 +61,75 @@ local_tools/
 └── package-lock.json   # Dependency lock
 ```
 
+## Key Features
+
+### Git Statistics Analysis (`git-stats`)
+The main feature is comprehensive Git repository analysis with options for:
+- Time range filtering (`--since`, `--until`)
+- Author filtering (`--author`)  
+- File exclusion patterns (`--exclude`) with wildcard support
+- Multiple statistical views: author contributions, file type analysis, daily activity charts
+- Visual horizontal bar charts for activity visualization
+- Excludes merge commits to focus on actual development work
+
+### File Exclusion System
+Supports comma-separated patterns: `"*.lock,node_modules/*,dist/*"`
+- Wildcard matching with `*`
+- Exact filename matching
+- Path-based exclusions
+
+### Dead Code Cleaning (`clean-code`)
+Advanced static analysis tool for Vue+Vite projects with comprehensive path resolution:
+
+**Configuration Support:**
+- **Vite Config**: Parses `vite.config.js/ts/mjs` for alias and extensions
+- **Vue CLI Config**: Parses `vue.config.js` for webpack alias configuration
+- **Path Aliases**: Supports `@`, custom aliases defined in build configs
+- **Extensions**: Respects configured file extensions resolution
+
+**Advanced Import/Export Analysis:**
+- **Named Imports**: `import {tempMousePosition} from "@/event/pipeline3/LineNet3"`
+- **Default Imports**: `import Component from './Component.vue'`
+- **Namespace Imports**: `import * as utils from './utils'`
+- **Mixed Imports**: `import Component, {helper} from './module'`
+- **Re-exports**: `export {item} from './other'`, `export * from './all'`
+- **Dynamic Imports**: `import('./component.vue')`, template literals
+- **Vue Router Lazy Loading**: `component: () => import('./views/Home.vue')`
+- **Webpack Code Splitting**: `require.ensure()` patterns
+- **Import-Export Matching**: Tracks which specific exports are actually used
+
+**Smart Entry Point Detection:**
+- Standard entry files (main.js, App.vue, index.js)
+- Configuration files (vite.config.js, vue.config.js, etc.)
+- Router and store index files (router/index.js, store/index.js)
+- Plugin directories and utility files
+- Asset files (CSS, SCSS, images in assets/)
+- Test files to prevent deletion of test utilities
+
+**Precision Analysis:**
+- **File-Level Detection**: Identifies completely unused files
+- **Export-Level Detection**: Finds unused exports in used files
+- **Usage Statistics**: Shows file usage rates and detailed metrics
+- **Safe Mode**: Only deletes files, preserves unused exports by default
+
+**Debugging Tools:**
+- **Debug Mode**: `--debug` flag for detailed analysis information
+- **File-Specific Debug**: `--debug-file <path>` to analyze why a specific file is marked as dead
+- **Standalone Debug Command**: `debug-file` command for deep investigation
+- **Reference Chain Tracking**: Shows complete import/export dependency chains
+- **Alias Resolution Debug**: Displays how path aliases are being resolved
+
+**Safety Features:**
+- **Backup System**: Automatic backup before deletion with restore capability
+- **Test Integration**: Runs `npm run dev` to verify changes don't break build  
+- **Interactive Mode**: Requires user confirmation before deletion
+- **Dry Run**: Preview mode to see what would be deleted
+- **Recursive Analysis**: Deep dependency traversal including dynamic imports
+
 ## Development Notes
 
 - **No testing framework** currently configured (test script is placeholder)
 - **No linting/formatting** tools setup
 - **Single-file architecture** suitable for current scale but may need refactoring as commands grow
 - **Chinese localization** throughout user-facing text
-- Commands output directly to console with Chinese formatting
+- Complex git analysis logic in `generateGitStats()` function (bin/cli.js:123-438)
