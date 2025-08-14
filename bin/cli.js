@@ -4,6 +4,7 @@ const { Command } = require('commander');
 const { generateGitStats } = require('../lib/commands/git-stats');
 const { cleanDeadCode } = require('../lib/commands/clean-code');
 const { debugFileUsage } = require('../lib/commands/debug-file');
+const { handleFFmpegCommand } = require('../lib/commands/ffmpeg-tools');
 const CommandHistory = require('../lib/utils/command-history');
 
 const program = new Command();
@@ -12,7 +13,7 @@ const commandHistory = new CommandHistory();
 program
   .name('awesome-tools')
   .description('强大工具集合')
-  .version('1.0.0');
+  .version('1.1.0');
 
 program
   .command('hello')
@@ -99,6 +100,38 @@ program
     }
   }));
 
+program
+  .command('ffmpeg')
+  .description('FFmpeg音视频格式转换和流媒体工具')
+  .option('-w, --wizard', '启动交互式转换向导')
+  .option('--status', '显示FFmpeg安装状态和版本信息')
+  .option('--update', '更新FFmpeg到最新版本')
+  .option('--reinstall', '重新安装FFmpeg')
+  .option('--uninstall', '卸载本地安装的FFmpeg')
+  .option('--install', '直接安装FFmpeg（跳过向导）')
+  .option('--convert <input>', '转换指定的视频/音频文件')
+  .option('-o, --output <output>', '指定输出文件路径')
+  .option('--format <format>', '指定输出格式 (mp4,avi,mkv,webm,flv,mp3,wav等)')
+  .option('--quality <level>', '质量等级 (1-高质量 2-平衡 3-移动 4-高压缩)')
+  .option('--preset <preset>', 'FFmpeg预设 (ultrafast,fast,medium,slow,veryslow)')
+  .option('--bitrate <rate>', '指定视频码率 (如: 4000k)')
+  .option('--audio-bitrate <rate>', '指定音频码率 (如: 128k)')
+  .option('--resolution <size>', '指定分辨率 (如: 1920x1080, 1280x720)')
+  .option('--fps <rate>', '指定帧率 (如: 30, 60)')
+  .option('--stream', '启动流媒体服务器模式')
+  .option('--stream-type <type>', '流媒体类型 (rtmp,hls,flv,dash)')
+  .option('--batch <dir>', '批量转换指定目录下的文件')
+  .option('--extract-audio', '从视频中提取音频')
+  .option('--compress', '启用压缩模式，减小文件大小')
+  .action(wrapAction('ffmpeg', async (options) => {
+    try {
+      await handleFFmpegCommand(options);
+    } catch (error) {
+      console.error('❌ 错误:', error.message);
+      process.exit(1);
+    }
+  }));
+
 // 将驼峰命名转换为连字符命名
 function convertToKebabCase(str) {
   return str.replace(/([A-Z])/g, '-$1').toLowerCase();
@@ -109,7 +142,8 @@ function isNegatedOption(commandName, optionKey) {
   const negatedOptions = {
     'clean-code': ['gitignore'], // --no-gitignore在选项中显示为gitignore
     'git-stats': [],
-    'debug-file': []
+    'debug-file': [],
+    'ffmpeg': []
   };
   
   return negatedOptions[commandName] && negatedOptions[commandName].includes(optionKey);
@@ -131,7 +165,8 @@ async function executeHistoryCommand(commandName, historyIndex) {
     const commandMap = {
       'git-stats': generateGitStats,
       'clean-code': cleanDeadCode,
-      'debug-file': debugFileUsage
+      'debug-file': debugFileUsage,
+      'ffmpeg': handleFFmpegCommand
     };
     
     const commandFunction = commandMap[commandName];
@@ -152,7 +187,7 @@ async function checkForHistoryMode() {
   const args = process.argv.slice(2);
   if (args.length === 1) {
     const commandName = args[0];
-    const validCommands = ['git-stats', 'clean-code', 'debug-file'];
+    const validCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg'];
     
     if (validCommands.includes(commandName)) {
       // 显示命令历史
@@ -164,7 +199,7 @@ async function checkForHistoryMode() {
     // 检查是否为数字（历史命令执行）
     const commandName = args[0];
     const possibleIndex = args[1];
-    const validCommands = ['git-stats', 'clean-code', 'debug-file'];
+    const validCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg'];
     
     if (validCommands.includes(commandName) && /^\d+$/.test(possibleIndex)) {
       await executeHistoryCommand(commandName, parseInt(possibleIndex));
@@ -211,6 +246,21 @@ function getCommandConfig(commandName) {
         { flags: '-r, --ref <path>', description: '声称引用它的文件路径 (必需)' },
         { flags: '--include <patterns>', description: '包含的文件模式' },
         { flags: '--exclude <patterns>', description: '排除的文件模式' }
+      ]
+    },
+    'ffmpeg': {
+      description: 'FFmpeg音视频格式转换和流媒体工具',
+      options: [
+        { flags: '-w, --wizard', description: '启动交互式转换向导' },
+        { flags: '--status', description: '显示FFmpeg安装状态' },
+        { flags: '--update', description: '更新FFmpeg到最新版本' },
+        { flags: '--convert <input>', description: '转换指定文件' },
+        { flags: '-o, --output <output>', description: '指定输出文件路径' },
+        { flags: '--format <format>', description: '指定输出格式' },
+        { flags: '--quality <level>', description: '质量等级 (1-4)' },
+        { flags: '--stream', description: '启动流媒体服务器' },
+        { flags: '--batch <dir>', description: '批量转换目录文件' },
+        { flags: '--extract-audio', description: '提取音频' }
       ]
     }
   };
