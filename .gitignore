@@ -113,3 +113,18 @@ Thumbs.db
 
 # Claude Code settings (local only)
 .claude/settings.local.json
+
+# FFmpeg generated content
+videos/
+hls/
+flv/
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.flv
+*.m3u8
+*.ts
+*.mp3
+*.aac
+*.wav
