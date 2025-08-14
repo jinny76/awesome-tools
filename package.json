@@ -1,10 +1,10 @@
 {
-  "name": "local_tools",
+  "name": "awesome_tools",
   "version": "1.0.0",
-  "description": "本地工具集合 - 提供Git统计分析等实用命令行工具",
+  "description": "强大工具集合 - 提供Git统计分析等实用命令行工具",
   "main": "bin/cli.js",
   "bin": {
-    "local-tools": "./bin/cli.js"
+    "awesome-tools": "./bin/cli.js"
   },
   "scripts": {
     "start": "node bin/cli.js",

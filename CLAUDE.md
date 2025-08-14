@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Node.js CLI toolkit called "local_tools" (本地工具集合) - a collection of local utility commands built with Commander.js. The project is designed as an extensible command-line interface for executing specific tasks locally.
+This is a Node.js CLI toolkit called "awesome_tools" (强大工具集合) - a collection of awesome utility commands built with Commander.js. The project is designed as an extensible command-line interface for executing specific tasks locally.
 
 ## Development Commands
 
@@ -50,14 +50,14 @@ program
 ```
 
 ### Package Configuration
-- **Binary**: Configured as `local-tools` command in package.json
+- **Binary**: Configured as `awesome-tools` command in package.json
 - **Node Requirements**: >=18.0.0
 - **Single Dependency**: commander for CLI framework
 
 ## Project Structure
 
 ```
-local_tools/
+awesome_tools/
 ├── bin/cli.js          # Main CLI executable and all commands
 ├── package.json        # Project config with binary definition
 └── package-lock.json   # Dependency lock
