@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vue Runtime Data Analysis</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .data-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        .data-table th, .data-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .data-table th { background-color: #f2f2f2; }
+        .stats { display: flex; gap: 20px; }
+        .stat-card { padding: 15px; background: #f8f9fa; border-radius: 5px; }
+        button { padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .empty-data { color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Vue Runtime Usage Analysis</h1>
+    
+    <div class="section">
+        <h2>📊 Quick Stats</h2>
+        <div class="stats" id="quickStats">
+            <div class="stat-card">
+                <h3>Sessions</h3>
+                <div id="sessionCount">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Components</h3>
+                <div id="componentCount">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Methods</h3>
+                <div id="methodCount">-</div>
+            </div>
+            <div class="stat-card">
+                <h3>Routes</h3>
+                <div id="routeCount">-</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>🎛️ Controls</h2>
+        <button onclick="loadData()">🔄 Load Data</button>
+        <button onclick="exportData()">💾 Export Data</button>
+        <button onclick="clearData()">🗑️ Clear Data</button>
+    </div>
+    
+    <div class="section">
+        <h2>📈 Usage Summary</h2>
+        <div id="usageSummary"></div>
+    </div>
+    
+    <div class="section">
+        <h2>📝 Session Details</h2>
+        <div id="sessionDetails"></div>
+    </div>
+    
+    <script>
+        let runtimeData = [];
+        
+        function loadData() {
+            try {
+                const rawData = localStorage.getItem('__vueUsageData');
+                if (!rawData) {
+                    alert('No runtime data found. Please run your Vue application with tracking enabled first.');
+                    return;
+                }
+                
+                runtimeData = JSON.parse(rawData);
+                updateStats();
+                updateUsageSummary();
+                updateSessionDetails();
+                
+                console.log('Loaded runtime data:', runtimeData);
+            } catch (error) {
+                alert('Error loading data: ' + error.message);
+            }
+        }
+        
+        function updateStats() {
+            const sessionCount = runtimeData.length;
+            const allComponents = new Set();
+            const allMethods = new Set();
+            const allRoutes = new Set();
+            
+            runtimeData.forEach(session => {
+                if (session.usage) {
+                    session.usage.components?.forEach(c => allComponents.add(c));
+                    session.usage.methods?.forEach(m => allMethods.add(m));
+                    session.usage.routes?.forEach(r => allRoutes.add(r));
+                }
+            });
+            
+            document.getElementById('sessionCount').textContent = sessionCount;
+            document.getElementById('componentCount').textContent = allComponents.size;
+            document.getElementById('methodCount').textContent = allMethods.size;
+            document.getElementById('routeCount').textContent = allRoutes.size;
+        }
+        
+        function updateUsageSummary() {
+            const summary = document.getElementById('usageSummary');
+            
+            if (runtimeData.length === 0) {
+                summary.innerHTML = '<div class="empty-data">No data available</div>';
+                return;
+            }
+            
+            const latest = runtimeData[runtimeData.length - 1];
+            const usage = latest.usage || {};
+            
+            let html = '<table class="data-table"><tr><th>Category</th><th>Items</th><th>Count</th></tr>';
+            
+            ['components', 'methods', 'computed', 'routes', 'events'].forEach(category => {
+                const items = usage[category] || [];
+                html += `<tr><td>${category}</td><td>${items.join(', ') || 'None'}</td><td>${items.length}</td></tr>`;
+            });
+            
+            html += '</table>';
+            summary.innerHTML = html;
+        }
+        
+        function updateSessionDetails() {
+            const details = document.getElementById('sessionDetails');
+            
+            if (runtimeData.length === 0) {
+                details.innerHTML = '<div class="empty-data">No sessions recorded</div>';
+                return;
+            }
+            
+            let html = '<table class="data-table"><tr><th>Session</th><th>Duration</th><th>URL</th><th>Events</th></tr>';
+            
+            runtimeData.forEach((session, index) => {
+                const duration = Math.round(session.sessionTime / 1000) + 's';
+                const eventCount = session.usage?.events?.length || 0;
+                const url = session.url || 'Unknown';
+                
+                html += `<tr><td>${index + 1}</td><td>${duration}</td><td>${url}</td><td>${eventCount}</td></tr>`;
+            });
+            
+            html += '</table>';
+            details.innerHTML = html;
+        }
+        
+        function exportData() {
+            if (runtimeData.length === 0) {
+                alert('No data to export. Load data first.');
+                return;
+            }
+            
+            const blob = new Blob([JSON.stringify(runtimeData, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'vue-runtime-data-' + new Date().toISOString().split('T')[0] + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function clearData() {
+            if (confirm('Are you sure you want to clear all runtime data?')) {
+                localStorage.removeItem('__vueUsageData');
+                runtimeData = [];
+                updateStats();
+                updateUsageSummary();
+                updateSessionDetails();
+                alert('Data cleared successfully.');
+            }
+        }
+        
+        // Auto-load data when page loads
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>

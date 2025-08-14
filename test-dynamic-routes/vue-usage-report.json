@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2025-08-13T23:56:12.802Z",
+  "summary": {
+    "totalSessions": 0,
+    "uniqueComponents": 0,
+    "uniqueMethods": 0,
+    "uniqueRoutes": 0
+  },
+  "details": {
+    "totalSessions": 0,
+    "uniqueComponents": {},
+    "uniqueMethods": {},
+    "uniqueRoutes": {},
+    "sessionData": [],
+    "analysisPagePath": "J:\\projects\\local_tools\\test-dynamic-routes\\analyze-runtime-data.html"
+  }
+}
