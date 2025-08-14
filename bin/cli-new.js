@@ -69,6 +69,8 @@ program
   .option('--no-gitignore', '忽略.gitignore文件中的排除规则')
   .option('--debug', '显示详细的调试信息')
   .option('--debug-file <path>', '额外调试特定文件 (相对路径)')
+  .option('--runtime', '启用运行时扫描，注入跟踪脚本到HTML文件')
+  .option('--analyze-runtime', '分析之前收集的运行时使用数据')
   .action(async (options) => {
     try {
       await cleanDeadCode(options);

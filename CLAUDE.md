@@ -26,6 +26,8 @@ npm start -- --help
 - `git-stats [options]` - Git repository commit history analysis with detailed statistics
 - `clean-code -d <path> [options]` - Clean dead code in Vue+Vite projects
 - `debug-file -d <path> -f <file>` - Debug why a specific file is marked as dead code
+- `clean-code -d <path> --runtime` - Inject runtime tracking into Vue application
+- `clean-code -d <path> --analyze-runtime` - Analyze collected runtime usage data
 
 ## Architecture
 
@@ -125,6 +127,53 @@ Advanced static analysis tool for Vue+Vite projects with comprehensive path reso
 - **Interactive Mode**: Requires user confirmation before deletion
 - **Dry Run**: Preview mode to see what would be deleted
 - **Recursive Analysis**: Deep dependency traversal including dynamic imports
+
+**Runtime Scanning (`--runtime`):**
+Advanced dynamic analysis that complements static analysis by tracking actual usage:
+
+**Core Features:**
+- **JavaScript Injection**: Automatically injects tracking script into HTML files
+- **Vue Framework Detection**: Supports both Vue 2 and Vue 3 applications
+- **Component Tracking**: Monitors component creation, mounting, and registration
+- **Method Call Tracking**: Records when Vue methods are actually invoked
+- **Route Usage Monitoring**: Tracks Vue Router navigation patterns
+- **Real-time Data Collection**: Collects usage data during application runtime
+- **Local Storage**: Stores usage data in browser localStorage for analysis
+- **Non-intrusive**: Minimal performance impact on running application
+
+**Vue 3 Specific Support:**
+- **Composition API Tracking**: Monitors ref, reactive, computed, watch usage
+- **createApp Detection**: Tracks Vue 3 application creation and mounting
+- **Plugin Usage**: Records Vue 3 plugin installations (router, pinia, etc.)
+- **Vue Router 4**: Enhanced support for Vue Router 4 navigation tracking
+- **Pinia Integration**: Detects and tracks Pinia store usage
+- **Element Plus**: Identifies Element Plus component usage
+
+**Technology Stack Compatibility:**
+- Vue 3.4+ with Composition API
+- Vue Router 4.2+ with history mode
+- Pinia 2.1+ for state management
+- Element Plus 2.5+ UI components
+- Axios 1.6+ for HTTP requests
+
+**Usage:**
+```bash
+# Step 1: Inject runtime tracking
+node bin/cli.js clean-code -d /path/to/vue-project --runtime
+
+# Step 2: Run your Vue application and use it normally
+# The tracking script will collect usage data automatically
+
+# Step 3: Analyze collected runtime data
+node bin/cli.js clean-code -d /path/to/vue-project --analyze-runtime
+```
+
+**Benefits:**
+- Identifies code that appears used statically but is never executed
+- Catches dynamic imports and runtime-only dependencies
+- Provides real user behavior insights
+- Reduces false positives in dead code detection
+- Complements static analysis with runtime evidence
 
 ## Development Notes
 
