@@ -1,8 +1,0 @@
-{
-  "name": "test-router-analysis",
-  "version": "1.0.0",
-  "dependencies": {
-    "vue": "^3.0.0",
-    "vue-router": "^4.0.0"
-  }
-}
