@@ -118,6 +118,11 @@ Thumbs.db
 videos/
 hls/
 flv/
+frames/
+subtitles/
+thumbnails/
+audio/
+compressed/
 *.mp4
 *.avi
 *.mov
@@ -128,3 +133,8 @@ flv/
 *.mp3
 *.aac
 *.wav
+*.srt
+*.ass
+*.vtt
+*.jpg
+*.png
