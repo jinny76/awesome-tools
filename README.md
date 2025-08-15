@@ -38,6 +38,7 @@ ats --help
 - 🌐 [Share Server](docs/commands/share-server.md) - 本地分享与端口映射
 - 💻 [Screensaver](docs/commands/screensaver.md) - 工作伪装屏保工具
 - 📱 [Notify](docs/commands/notify.md) - Server酱消息推送服务
+- 🤖 [MCP集成](docs/MCP-INTEGRATION.md) - Claude Desktop集成指南
 
 ## 🚀 典型使用场景
 
@@ -65,7 +66,7 @@ ats ff --imageToBase64 logo.png --clipboard
 ats ff --batch --compress
 ```
 
-### 团队协作
+### 团队协作与通知
 ```bash
 # 分享项目文档
 ats ss -d ./docs --tunnel
@@ -78,6 +79,16 @@ ats cc -d . --runtime
 
 # 部署完成通知
 ats n -t "✅ 部署成功" -d "版本 v1.2.0 已上线"
+```
+
+### Claude Desktop集成
+```bash
+# 配置MCP集成
+ats notify --wizard  # 配置SendKey
+
+# 在Claude中直接使用：
+# "请发送服务器告警通知，CPU使用率90%"
+# "发送项目部署完成的Markdown报告"
 ```
 
 ## 💎 为什么选择 Awesome Tools？

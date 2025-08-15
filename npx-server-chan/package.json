@@ -1,0 +1,44 @@
+{
+  "name": "server-chan-push",
+  "version": "1.0.0",
+  "description": "国内首创极简Server酱推送工具，支持NPX和MCP集成",
+  "main": "index.js",
+  "bin": {
+    "server-chan-push": "./bin/cli.js",
+    "scp": "./bin/cli.js"
+  },
+  "scripts": {
+    "test": "node test/test.js",
+    "prepublishOnly": "npm test"
+  },
+  "keywords": [
+    "server-chan",
+    "serverchan",
+    "push",
+    "notify",
+    "wechat",
+    "notification",
+    "npx",
+    "mcp",
+    "cli"
+  ],
+  "author": "Awesome Tools Team",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/server-chan-push.git"
+  },
+  "homepage": "https://github.com/yourusername/server-chan-push#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "files": [
+    "bin/",
+    "lib/",
+    "index.js",
+    "mcp.js",
+    "README.md"
+  ]
+}
