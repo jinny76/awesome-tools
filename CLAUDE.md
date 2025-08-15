@@ -31,6 +31,7 @@ ats --help
 - `ffmpeg` | `ff` [options] - FFmpeg audio/video conversion and streaming tools
 - `share-server` | `ss` [options] - Local directory sharing server with auth and public access
 - `remote-server` | `rs` [options] - SSH tunnel tool for mapping remote server ports to local ports
+- `screensaver` | `screen` [options] - Work disguise screensaver tool with multiple professional scenarios
 
 ## Architecture
 
@@ -211,6 +212,43 @@ node bin/cli.js clean-code -d /path/to/vue-project --analyze-runtime
 - Provides real user behavior insights
 - Reduces false positives in dead code detection
 - Complements static analysis with runtime evidence
+
+### Work Disguise Screensaver (`screensaver`)
+Professional screensaver tool designed to create convincing work simulation for productivity camouflage:
+
+**Available Screensaver Types:**
+- `coding` - Real-time code writing simulation with multiple programming languages
+- `logs` - Server log monitoring with realistic system events and timestamps
+- `compiler` - C++ compilation process with build steps, warnings, and progress
+- `analysis` - Data analysis dashboard with charts, statistics, and processing
+- `network` - Network security monitoring with traffic analysis and threat detection
+
+**Key Features:**
+- **Dynamic Screen Utilization**: Automatically detects terminal size and uses full available space
+- **Historical Data Pre-filling**: Loads realistic historical data before starting real-time simulation
+- **Interactive Selection**: Wizard mode (`-w`) for easy screensaver type selection
+- **Customizable Speed**: Adjustable animation speed with `--speed` parameter
+- **Authentic Simulation**: Realistic timing, colors, and professional terminology
+
+**Usage Examples:**
+```bash
+# Interactive selection wizard
+awesome-tools screensaver --wizard
+ats screen -w
+
+# Direct screensaver launch
+awesome-tools screensaver --type coding
+ats screen -t logs --speed 500
+
+# Available types: coding, logs, compiler, analysis, network
+```
+
+**Technical Implementation:**
+- Built with dynamic ES module loading for chalk v5.5.0 and ora v8.2.0 compatibility
+- Uses terminal control sequences for real-time rendering
+- Implements professional keyboard input handling
+- Features realistic data generation algorithms
+- Supports graceful exit with Ctrl+C
 
 ## Development Notes
 

@@ -6,6 +6,7 @@ const { cleanDeadCode } = require('../lib/commands/clean-code');
 const { debugFileUsage } = require('../lib/commands/debug-file');
 const { handleFFmpegCommand } = require('../lib/commands/ffmpeg-tools');
 const { startShareServer } = require('../lib/commands/share-server');
+const { startScreensaver } = require('../lib/commands/screensaver');
 const CommandHistory = require('../lib/utils/command-history');
 
 const program = new Command();
@@ -198,6 +199,22 @@ program
     }
   }));
 
+program
+  .command('screensaver')
+  .alias('screen')
+  .description('屏保工具：完美伪装工作状态，支持代码编写、日志监控、编译等场景')
+  .option('-w, --wizard', '启动交互式选择向导')
+  .option('-t, --type <type>', '屏保类型 (coding/logs/compiler/analysis/network)')
+  .option('-s, --speed <ms>', '动画速度 (毫秒)', '100')
+  .action(wrapAction('screensaver', async (options) => {
+    try {
+      await startScreensaver(options);
+    } catch (error) {
+      console.error('❌ 错误:', error.message);
+      process.exit(1);
+    }
+  }));
+
 // 将驼峰命名转换为连字符命名
 function convertToKebabCase(str) {
   return str.replace(/([A-Z])/g, '-$1').toLowerCase();
@@ -211,7 +228,8 @@ function getCommandAlias() {
     'df': 'debug-file',
     'ff': 'ffmpeg',
     'ss': 'share-server',
-    'rs': 'remote-server'
+    'rs': 'remote-server',
+    'screen': 'screensaver'
   };
 }
 
@@ -223,7 +241,7 @@ function getFullCommandName(commandName) {
 
 // 获取所有有效命令（包括别名）
 function getAllValidCommands() {
-  const fullCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server', 'remote-server'];
+  const fullCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server', 'remote-server', 'screensaver'];
   const aliases = Object.keys(getCommandAlias());
   return [...fullCommands, ...aliases];
 }
@@ -258,7 +276,8 @@ async function executeHistoryCommand(commandName, historyIndex) {
       'clean-code': cleanDeadCode,
       'debug-file': debugFileUsage,
       'ffmpeg': handleFFmpegCommand,
-      'share-server': startShareServer
+      'share-server': startShareServer,
+      'screensaver': startScreensaver
     };
     
     const commandFunction = commandMap[commandName];
@@ -392,6 +411,14 @@ function getCommandConfig(commandName) {
         { flags: '--host <host>', description: '临时指定服务器地址' },
         { flags: '--user <user>', description: '临时指定用户名' },
         { flags: '--key <path>', description: '临时指定SSH密钥路径' }
+      ]
+    },
+    'screensaver': {
+      description: '屏保工具：完美伪装工作状态，支持代码编写、日志监控、编译等场景',
+      options: [
+        { flags: '-w, --wizard', description: '启动交互式选择向导' },
+        { flags: '-t, --type <type>', description: '屏保类型 (coding/logs/compiler/analysis/network)' },
+        { flags: '-s, --speed <ms>', description: '动画速度 (毫秒)' }
       ]
     }
   };
