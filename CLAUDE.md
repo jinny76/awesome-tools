@@ -9,25 +9,27 @@ This is a Node.js CLI toolkit called "awesome_tools" (强大工具集合) - a co
 ## Development Commands
 
 ```bash
-# Run the CLI application
-npm start -- <command> [options]
+# Run the CLI application (supports both long and short names)
+awesome-tools <command> [options]  # 完整命令名
+ats <command> [options]             # 缩写命令名
 
 # Test commands directly
 node bin/cli.js <command> [options]
 
 # View available commands
-npm start -- --help
+awesome-tools --help
+ats --help
 ```
 
-**Available CLI Commands:**
+**Available CLI Commands with Aliases:**
 - `hello --name <name>` - Greeting command
 - `date` - Display current date/time in Chinese locale  
 - `info` - Show system information (Node.js version, OS, architecture)
-- `git-stats [options]` - Git repository commit history analysis with detailed statistics
-- `clean-code -d <path> [options]` - Clean dead code in Vue+Vite projects
-- `debug-file -d <path> -f <file>` - Debug why a specific file is marked as dead code
-- `clean-code -d <path> --runtime` - Inject runtime tracking into Vue application
-- `clean-code -d <path> --analyze-runtime` - Analyze collected runtime usage data
+- `git-stats` | `gs` [options] - Git repository commit history analysis with detailed statistics
+- `clean-code` | `cc` -d <path> [options] - Clean dead code in Vue+Vite projects
+- `debug-file` | `df` -d <path> -f <file> - Debug why a specific file is marked as dead code
+- `ffmpeg` | `ff` [options] - FFmpeg audio/video conversion and streaming tools
+- `share-server` | `ss` [options] - Local directory sharing server with auth and public access
 
 ## Architecture
 

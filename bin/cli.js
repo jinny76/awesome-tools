@@ -13,7 +13,7 @@ const commandHistory = new CommandHistory();
 
 program
   .name('awesome-tools')
-  .description('强大工具集合')
+  .description('强大工具集合 (可使用 ats 作为缩写)')
   .version('1.1.0');
 
 program
@@ -45,6 +45,7 @@ program
 
 program
   .command('git-stats')
+  .alias('gs')
   .description('Git提交历史统计报告')
   .option('-d, --dir <path>', 'Git目录路径', '.')
   .option('-s, --since <date>', '起始时间 (如: 2024-01-01, "1 month ago")')
@@ -62,6 +63,7 @@ program
 
 program
   .command('clean-code')
+  .alias('cc')
   .description('清理Vue+Vite项目中的死代码')
   .requiredOption('-d, --dir <path>', '前端项目根目录路径')
   .option('-e, --entry <paths>', '自定义入口文件 (逗号分隔，相对于项目根目录)')
@@ -86,6 +88,7 @@ program
 
 program
   .command('debug-file')
+  .alias('df')
   .description('调试特定文件的引用情况，分析为什么被标记为死代码')
   .requiredOption('-d, --dir <path>', '前端项目根目录路径')
   .requiredOption('-f, --file <path>', '被质疑的文件路径 (相对于项目根目录)')
@@ -103,6 +106,7 @@ program
 
 program
   .command('ffmpeg')
+  .alias('ff')
   .description('FFmpeg音视频格式转换和流媒体工具')
   .option('-w, --wizard', '启动交互式转换向导')
   .option('--status', '显示FFmpeg安装状态和版本信息')
@@ -140,6 +144,7 @@ program
 
 program
   .command('share-server')
+  .alias('ss')
   .description('本地目录分享服务器，支持认证和公网访问')
   .option('-w, --wizard', '启动交互式配置向导')
   .option('-d, --dir <path>', '要分享的本地目录路径')
@@ -165,6 +170,30 @@ program
 // 将驼峰命名转换为连字符命名
 function convertToKebabCase(str) {
   return str.replace(/([A-Z])/g, '-$1').toLowerCase();
+}
+
+// 命令别名映射
+function getCommandAlias() {
+  return {
+    'gs': 'git-stats',
+    'cc': 'clean-code', 
+    'df': 'debug-file',
+    'ff': 'ffmpeg',
+    'ss': 'share-server'
+  };
+}
+
+// 获取命令的全名（支持别名）
+function getFullCommandName(commandName) {
+  const aliases = getCommandAlias();
+  return aliases[commandName] || commandName;
+}
+
+// 获取所有有效命令（包括别名）
+function getAllValidCommands() {
+  const fullCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server'];
+  const aliases = Object.keys(getCommandAlias());
+  return [...fullCommands, ...aliases];
 }
 
 // 检查是否为否定选项
@@ -218,22 +247,25 @@ async function checkForHistoryMode() {
   const args = process.argv.slice(2);
   if (args.length === 1) {
     const commandName = args[0];
-    const validCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server'];
+    const validCommands = getAllValidCommands();
     
     if (validCommands.includes(commandName)) {
+      // 获取命令全名
+      const fullCommandName = getFullCommandName(commandName);
       // 显示命令历史
-      const commandConfig = getCommandConfig(commandName);
-      commandHistory.showCommandHelp(commandName, commandConfig.description, commandConfig.options);
+      const commandConfig = getCommandConfig(fullCommandName);
+      commandHistory.showCommandHelp(fullCommandName, commandConfig.description, commandConfig.options);
       return true;
     }
   } else if (args.length === 2) {
     // 检查是否为数字（历史命令执行）
     const commandName = args[0];
     const possibleIndex = args[1];
-    const validCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server'];
+    const validCommands = getAllValidCommands();
     
     if (validCommands.includes(commandName) && /^\d+$/.test(possibleIndex)) {
-      await executeHistoryCommand(commandName, parseInt(possibleIndex));
+      const fullCommandName = getFullCommandName(commandName);
+      await executeHistoryCommand(fullCommandName, parseInt(possibleIndex));
       return true;
     }
   }

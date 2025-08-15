@@ -4,7 +4,8 @@
   "description": "强大工具集合 - 提供Git统计分析、Vue项目清理、FFmpeg音视频转换等实用命令行工具",
   "main": "bin/cli.js",
   "bin": {
-    "awesome-tools": "./bin/cli.js"
+    "awesome-tools": "./bin/cli.js",
+    "ats": "./bin/cli.js"
   },
   "scripts": {
     "start": "node bin/cli.js",
