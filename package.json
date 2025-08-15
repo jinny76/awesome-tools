@@ -21,6 +21,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "clipboardy": "^4.0.0",
     "commander": "^13.1.0",
     "qrcode": "^1.5.4"
   }

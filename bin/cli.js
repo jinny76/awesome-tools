@@ -124,6 +124,11 @@ program
   .option('--batch <dir>', '批量转换指定目录下的文件')
   .option('--extract-audio', '从视频中提取音频')
   .option('--compress', '启用压缩模式，减小文件大小')
+  .option('--convertImage <file>', '转换图片格式')
+  .option('--imageToBase64 <file>', '将图片转换为Base64编码')
+  .option('--base64ToImage <data>', '将Base64编码转换为图片')
+  .option('--name <name>', '指定输出文件名（用于Base64转图片）')
+  .option('--clipboard', '将Base64结果复制到剪贴板')
   .action(wrapAction('ffmpeg', async (options) => {
     try {
       await handleFFmpegCommand(options);
@@ -286,7 +291,12 @@ function getCommandConfig(commandName) {
         { flags: '--quality <level>', description: '质量等级 (1-4)' },
         { flags: '--stream', description: '启动流媒体服务器' },
         { flags: '--batch <dir>', description: '批量转换目录文件' },
-        { flags: '--extract-audio', description: '提取音频' }
+        { flags: '--extract-audio', description: '提取音频' },
+        { flags: '--convertImage <file>', description: '转换图片格式' },
+        { flags: '--imageToBase64 <file>', description: '图片转Base64编码' },
+        { flags: '--base64ToImage <data>', description: 'Base64转图片' },
+        { flags: '--name <name>', description: '指定输出文件名' },
+        { flags: '--clipboard', description: '复制Base64到剪贴板' }
       ]
     },
     'share-server': {
