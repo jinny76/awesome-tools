@@ -62,9 +62,34 @@ program
 
 ```
 awesome_tools/
-├── bin/cli.js          # Main CLI executable and all commands
-├── package.json        # Project config with binary definition
-└── package-lock.json   # Dependency lock
+├── bin/cli.js                 # Main CLI executable and command definitions
+├── lib/                       # Command implementations
+│   ├── commands/              # Individual command modules
+│   │   ├── git-stats.js       # Git statistics analysis
+│   │   ├── clean-code.js      # Vue dead code cleaner
+│   │   ├── debug-file.js      # File reference debugger
+│   │   ├── ffmpeg-tools.js    # FFmpeg media processor
+│   │   ├── share-server.js    # Local sharing server
+│   │   ├── remote-server.js   # SSH port forwarding
+│   │   └── screensaver.js     # Work disguise screensaver
+│   └── utils/                 # Utility modules
+│       ├── command-history.js # Command history tracking
+│       ├── file-analyzer.js   # File analysis utilities
+│       ├── dependency-analyzer.js # Dependency graph analysis
+│       ├── router-analyzer.js # Vue Router analysis
+│       ├── runtime-scanner.js # Vue runtime tracking
+│       └── project-config.js  # Project configuration parser
+├── docs/                      # Documentation
+│   └── commands/              # Individual command docs
+│       ├── git-stats.md       # Git Stats documentation
+│       ├── clean-code.md      # Clean Code documentation
+│       ├── ffmpeg.md          # FFmpeg documentation
+│       ├── share-server.md    # Share Server documentation
+│       └── screensaver.md     # Screensaver documentation
+├── package.json               # Project config with binary definition
+├── package-lock.json          # Dependency lock file
+├── README.md                  # Main project documentation (simplified)
+└── CLAUDE.md                  # This file - development guidance
 ```
 
 ### Remote Server (`remote-server`)
