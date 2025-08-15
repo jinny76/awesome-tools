@@ -182,3 +182,4 @@ node bin/cli.js clean-code -d /path/to/vue-project --analyze-runtime
 - **Single-file architecture** suitable for current scale but may need refactoring as commands grow
 - **Chinese localization** throughout user-facing text
 - Complex git analysis logic in `generateGitStats()` function (bin/cli.js:123-438)
+- 当超过三分钟的任务完成了, 通过mcp发送消息到serverchan, 内容是"CC任务完成" 

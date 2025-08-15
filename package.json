@@ -10,13 +10,18 @@
     "start": "node bin/cli.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["cli", "tools", "local"],
+  "keywords": [
+    "cli",
+    "tools",
+    "local"
+  ],
   "author": "",
   "license": "ISC",
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "commander": "^13.1.0"
+    "commander": "^13.1.0",
+    "qrcode": "^1.5.4"
   }
 }

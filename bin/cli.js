@@ -5,6 +5,7 @@ const { generateGitStats } = require('../lib/commands/git-stats');
 const { cleanDeadCode } = require('../lib/commands/clean-code');
 const { debugFileUsage } = require('../lib/commands/debug-file');
 const { handleFFmpegCommand } = require('../lib/commands/ffmpeg-tools');
+const { startShareServer } = require('../lib/commands/share-server');
 const CommandHistory = require('../lib/utils/command-history');
 
 const program = new Command();
@@ -132,6 +133,30 @@ program
     }
   }));
 
+program
+  .command('share-server')
+  .description('本地目录分享服务器，支持认证和公网访问')
+  .option('-w, --wizard', '启动交互式配置向导')
+  .option('-d, --dir <path>', '要分享的本地目录路径')
+  .option('-p, --port <number>', '服务器端口', '33333')
+  .option('-u, --username <string>', '认证用户名', 'admin')
+  .option('--password <string>', '认证密码', 'password')
+  .option('--max-upload <size>', '最大上传文件大小', '10MB')
+  .option('--cors-origin <origin>', 'CORS允许的源', '*')
+  .option('--tunnel', '启用公网访问隧道(ngrok)')
+  .option('--custom-mime <types>', '自定义MIME类型映射 (格式: ext:type,ext:type)')
+  .option('--index', '启用目录索引浏览功能')
+  .option('--no-auth', '禁用认证，允许匿名访问')
+  .option('--port-map <port>', '端口映射模式：直接映射指定本地端口到外网（忽略网站相关参数）')
+  .action(wrapAction('share-server', async (options) => {
+    try {
+      await startShareServer(options);
+    } catch (error) {
+      console.error('❌ 错误:', error.message);
+      process.exit(1);
+    }
+  }));
+
 // 将驼峰命名转换为连字符命名
 function convertToKebabCase(str) {
   return str.replace(/([A-Z])/g, '-$1').toLowerCase();
@@ -166,7 +191,8 @@ async function executeHistoryCommand(commandName, historyIndex) {
       'git-stats': generateGitStats,
       'clean-code': cleanDeadCode,
       'debug-file': debugFileUsage,
-      'ffmpeg': handleFFmpegCommand
+      'ffmpeg': handleFFmpegCommand,
+      'share-server': startShareServer
     };
     
     const commandFunction = commandMap[commandName];
@@ -187,7 +213,7 @@ async function checkForHistoryMode() {
   const args = process.argv.slice(2);
   if (args.length === 1) {
     const commandName = args[0];
-    const validCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg'];
+    const validCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server'];
     
     if (validCommands.includes(commandName)) {
       // 显示命令历史
@@ -199,7 +225,7 @@ async function checkForHistoryMode() {
     // 检查是否为数字（历史命令执行）
     const commandName = args[0];
     const possibleIndex = args[1];
-    const validCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg'];
+    const validCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server'];
     
     if (validCommands.includes(commandName) && /^\d+$/.test(possibleIndex)) {
       await executeHistoryCommand(commandName, parseInt(possibleIndex));
@@ -261,6 +287,23 @@ function getCommandConfig(commandName) {
         { flags: '--stream', description: '启动流媒体服务器' },
         { flags: '--batch <dir>', description: '批量转换目录文件' },
         { flags: '--extract-audio', description: '提取音频' }
+      ]
+    },
+    'share-server': {
+      description: '本地目录分享服务器，支持认证和公网访问',
+      options: [
+        { flags: '-w, --wizard', description: '启动交互式配置向导' },
+        { flags: '-d, --dir <path>', description: '要分享的本地目录路径' },
+        { flags: '-p, --port <number>', description: '服务器端口' },
+        { flags: '-u, --username <string>', description: '认证用户名' },
+        { flags: '--password <string>', description: '认证密码' },
+        { flags: '--max-upload <size>', description: '最大上传文件大小' },
+        { flags: '--cors-origin <origin>', description: 'CORS允许的源' },
+        { flags: '--tunnel', description: '启用公网访问隧道' },
+        { flags: '--custom-mime <types>', description: '自定义MIME类型映射' },
+        { flags: '--index', description: '启用目录索引浏览功能' },
+        { flags: '--no-auth', description: '禁用认证，允许匿名访问' },
+        { flags: '--port-map <port>', description: '端口映射模式：直接映射指定本地端口到外网' }
       ]
     }
   };
