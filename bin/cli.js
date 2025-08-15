@@ -7,6 +7,7 @@ const { debugFileUsage } = require('../lib/commands/debug-file');
 const { handleFFmpegCommand } = require('../lib/commands/ffmpeg-tools');
 const { startShareServer } = require('../lib/commands/share-server');
 const { startScreensaver } = require('../lib/commands/screensaver');
+const { startNotify } = require('../lib/commands/server-chan');
 const CommandHistory = require('../lib/utils/command-history');
 
 const program = new Command();
@@ -215,6 +216,33 @@ program
     }
   }));
 
+program
+  .command('notify')
+  .alias('n')
+  .description('Server酱消息推送：发送通知到微信等平台')
+  .option('-w, --wizard', '启动配置向导')
+  .option('--add <name:sendkey>', '添加SendKey (格式: name:SCTxxxxx)')
+  .option('--remove <name>', '删除SendKey')
+  .option('--list', '列出所有SendKey')
+  .option('--set-default <name>', '设置默认通道')
+  .option('--test [channel]', '测试发送')
+  .option('-t, --title <title>', '消息标题')
+  .option('-d, --desp <content>', '消息内容 (支持Markdown)')
+  .option('-c, --content <content>', '消息内容 (--desp的别名)')
+  .option('--channel <name>', '发送通道 (留空使用默认，*表示群发)')
+  .option('--tags <tags>', '消息标签 (用|分隔)')
+  .option('--short <text>', '短消息内容')
+  .option('--stdin', '从标准输入读取消息')
+  .option('--default', '添加SendKey时设为默认')
+  .action(wrapAction('notify', async (options) => {
+    try {
+      await startNotify(options);
+    } catch (error) {
+      console.error('❌ 错误:', error.message);
+      process.exit(1);
+    }
+  }));
+
 // 将驼峰命名转换为连字符命名
 function convertToKebabCase(str) {
   return str.replace(/([A-Z])/g, '-$1').toLowerCase();
@@ -229,7 +257,8 @@ function getCommandAlias() {
     'ff': 'ffmpeg',
     'ss': 'share-server',
     'rs': 'remote-server',
-    'screen': 'screensaver'
+    'screen': 'screensaver',
+    'n': 'notify'
   };
 }
 
@@ -241,7 +270,7 @@ function getFullCommandName(commandName) {
 
 // 获取所有有效命令（包括别名）
 function getAllValidCommands() {
-  const fullCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server', 'remote-server', 'screensaver'];
+  const fullCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server', 'remote-server', 'screensaver', 'notify'];
   const aliases = Object.keys(getCommandAlias());
   return [...fullCommands, ...aliases];
 }
@@ -277,7 +306,8 @@ async function executeHistoryCommand(commandName, historyIndex) {
       'debug-file': debugFileUsage,
       'ffmpeg': handleFFmpegCommand,
       'share-server': startShareServer,
-      'screensaver': startScreensaver
+      'screensaver': startScreensaver,
+      'notify': startNotify
     };
     
     const commandFunction = commandMap[commandName];
@@ -419,6 +449,18 @@ function getCommandConfig(commandName) {
         { flags: '-w, --wizard', description: '启动交互式选择向导' },
         { flags: '-t, --type <type>', description: '屏保类型 (coding/logs/compiler/analysis/network)' },
         { flags: '-s, --speed <ms>', description: '动画速度 (毫秒)' }
+      ]
+    },
+    'notify': {
+      description: 'Server酱消息推送：发送通知到微信等平台',
+      options: [
+        { flags: '-w, --wizard', description: '启动配置向导' },
+        { flags: '--add <name:key>', description: '添加SendKey' },
+        { flags: '--list', description: '列出所有SendKey' },
+        { flags: '-t, --title <title>', description: '消息标题' },
+        { flags: '-d, --desp <content>', description: '消息内容' },
+        { flags: '--channel <name>', description: '发送通道' },
+        { flags: '--test [channel]', description: '测试发送' }
       ]
     }
   };
