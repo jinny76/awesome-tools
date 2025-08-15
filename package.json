@@ -22,8 +22,11 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "cli-table3": "^0.6.5",
     "clipboardy": "^4.0.0",
     "commander": "^13.1.0",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "read": "^4.1.0",
+    "ssh2": "^1.16.0"
   }
 }

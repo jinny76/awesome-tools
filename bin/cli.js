@@ -143,6 +143,37 @@ program
   }));
 
 program
+  .command('remote-server')
+  .alias('rs')
+  .description('SSH端口转发工具，映射远程服务器端口到本地')
+  .option('-w, --wizard', '启动交互式配置向导')
+  .option('--list', '列出所有服务器和预设配置')
+  .option('--status', '显示当前活跃的隧道状态')
+  .option('--stop', '停止所有隧道')
+  .option('--add <name>', '添加新的服务器配置')
+  .option('--connect <name>', '连接到指定服务器')
+  .option('--only <services>', '只映射指定服务 (逗号分隔)')
+  .option('--host <host>', '临时指定服务器地址')
+  .option('--port <port>', '临时指定SSH端口 (默认: 22)')
+  .option('--user <user>', '临时指定用户名')
+  .option('--jump <host>', '通过跳板机连接')
+  .option('--background', '后台运行模式')
+  .option('--auto-reconnect', '断线自动重连')
+  .option('--debug', '显示详细调试信息')
+  .action(wrapAction('remote-server', async (options) => {
+    try {
+      const { handleRemoteServerCommand } = require('../lib/commands/remote-server');
+      await handleRemoteServerCommand(options);
+    } catch (error) {
+      console.error('❌ 错误:', error.message);
+      if (error.stack && options.debug) {
+        console.error(error.stack);
+      }
+      process.exit(1);
+    }
+  }));
+
+program
   .command('share-server')
   .alias('ss')
   .description('本地目录分享服务器，支持认证和公网访问')
@@ -179,7 +210,8 @@ function getCommandAlias() {
     'cc': 'clean-code', 
     'df': 'debug-file',
     'ff': 'ffmpeg',
-    'ss': 'share-server'
+    'ss': 'share-server',
+    'rs': 'remote-server'
   };
 }
 
@@ -191,7 +223,7 @@ function getFullCommandName(commandName) {
 
 // 获取所有有效命令（包括别名）
 function getAllValidCommands() {
-  const fullCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server'];
+  const fullCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server', 'remote-server'];
   const aliases = Object.keys(getCommandAlias());
   return [...fullCommands, ...aliases];
 }
@@ -346,6 +378,20 @@ function getCommandConfig(commandName) {
         { flags: '--index', description: '启用目录索引浏览功能' },
         { flags: '--no-auth', description: '禁用认证，允许匿名访问' },
         { flags: '--port-map <port>', description: '端口映射模式：直接映射指定本地端口到外网' }
+      ]
+    },
+    'remote-server': {
+      description: 'SSH端口转发工具，映射远程服务器端口到本地',
+      options: [
+        { flags: '-w, --wizard', description: '启动交互式配置向导' },
+        { flags: '--list', description: '列出所有服务器和预设配置' },
+        { flags: '--status', description: '显示当前活跃的隧道状态' },
+        { flags: '--stop', description: '停止所有隧道' },
+        { flags: '--connect <name>', description: '连接到指定服务器' },
+        { flags: '--only <services>', description: '只映射指定服务' },
+        { flags: '--host <host>', description: '临时指定服务器地址' },
+        { flags: '--user <user>', description: '临时指定用户名' },
+        { flags: '--key <path>', description: '临时指定SSH密钥路径' }
       ]
     }
   };

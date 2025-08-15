@@ -30,6 +30,7 @@ ats --help
 - `debug-file` | `df` -d <path> -f <file> - Debug why a specific file is marked as dead code
 - `ffmpeg` | `ff` [options] - FFmpeg audio/video conversion and streaming tools
 - `share-server` | `ss` [options] - Local directory sharing server with auth and public access
+- `remote-server` | `rs` [options] - SSH tunnel tool for mapping remote server ports to local ports
 
 ## Architecture
 
@@ -64,6 +65,40 @@ awesome_tools/
 ├── package.json        # Project config with binary definition
 └── package-lock.json   # Dependency lock
 ```
+
+### Remote Server (`remote-server`)
+Simplified SSH tunnel management tool that provides secure port forwarding from remote servers to local ports using password authentication.
+
+**Core Features:**
+- **Password-only Authentication**: Simplified from SSH key complexity to secure password authentication
+- **Encrypted Password Storage**: AES-256-CBC encryption for stored passwords with user-specific keys
+- **Interactive Configuration Wizard**: Guided setup for server configurations and port mappings
+- **Automatic Port Conflict Resolution**: Detects port usage and automatically assigns available ports
+- **Preset Service Support**: Pre-configured mappings for MySQL, Redis, PostgreSQL, MongoDB, etc.
+- **Multiple Tunnel Management**: Support for multiple concurrent SSH tunnels
+
+**Usage Examples:**
+```bash
+# Interactive wizard for configuration and connection
+ats rs --wizard
+ats rs -w
+
+# Quick operations
+ats rs --list                # List all server configurations
+ats rs --connect server1     # Connect to saved server
+ats rs --status              # Show active tunnels
+ats rs --stop                # Stop all tunnels
+
+# Direct service connection (requires server details input)
+ats rs mysql                 # Connect to MySQL service
+ats rs redis                 # Connect to Redis service
+```
+
+**Security Features:**
+- AES-256-CBC password encryption with user-specific keys
+- Optional password storage (users can choose not to save passwords)
+- Secure key derivation using scrypt
+- No SSH key management complexity
 
 ## Key Features
 
