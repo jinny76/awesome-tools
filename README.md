@@ -1,10 +1,21 @@
-# Awesome Tools 🚀
+# Awesome Tools (ats) 🚀
 
-强大的命令行工具集合，提供Git统计分析、Vue项目死代码清理等实用功能。
+强大的命令行工具集合，提供Git统计分析、Vue项目死代码清理、FFmpeg音视频处理等实用功能。
+**支持超简洁缩写命令，大幅提升使用体验！**
 
 [![npm version](https://img.shields.io/npm/v/awesome_tools.svg)](https://www.npmjs.com/package/awesome_tools)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
+
+## ⚡ 超简洁命令速查
+
+```bash
+ats --help          # 查看帮助
+ats gs              # Git统计分析 (75%节省)
+ats cc -d .         # Vue死代码清理 (73%节省)  
+ats ff --wizard     # FFmpeg工具向导 (77%节省)
+ats ss --port-map 3000  # 本地服务上公网 (75%节省)
+```
 
 ## ✨ 主要特性
 
@@ -14,8 +25,9 @@
 - 📚 **命令历史记录** - 自动记录命令执行历史，支持快速重复执行
 - 🛠️ **Vue运行时扫描** - 注入跟踪脚本，识别实际运行时使用的代码
 - 🎯 **智能路径解析** - 支持Vue项目的别名和扩展名配置
-- 🎬 **FFmpeg工具集** - 完整的音视频处理套件：格式转换、抽帧、字幕提取、流媒体服务器
+- 🎬 **FFmpeg工具集** - 完整的音视频+图片处理套件：格式转换、抽帧、Base64编码、流媒体服务器
 - 🌐 **本地分享服务器** - 快速分享本地目录和端口映射，支持公网访问和二维码扫描
+- ⚡ **超简洁命令** - 所有命令支持缩写，平均节省75%输入量
 
 ## 🚀 快速开始
 
@@ -31,41 +43,74 @@ cd awesome-tools
 npm link
 ```
 
-### 基本使用
+### ⚡ 快速开始 (推荐缩写命令)
 
 ```bash
-# 查看帮助
-awesome-tools --help
+# 🔥 超简洁缩写命令 - 主推方式！
+ats --help                          # 查看帮助 (代替 awesome-tools --help)
 
-# Git统计分析
-awesome-tools git-stats -d . --since "1 month ago"
+# 📊 Git统计分析
+ats gs -d . --since "1 month ago"   # 代替 awesome-tools git-stats
 
-# Vue项目死代码清理（预览模式）
-awesome-tools clean-code -d /path/to/vue/project --dry-run
+# 🧹 Vue项目死代码清理（预览模式）
+ats cc -d /path/to/vue/project --dry-run  # 代替 awesome-tools clean-code
 
-# 调试文件引用关系
-awesome-tools debug-file -d /path/to/project -f src/Component.vue -r src/App.vue
+# 🔍 调试文件引用关系
+ats df -d /path/to/project -f src/Component.vue -r src/App.vue  # 代替 awesome-tools debug-file
 
-# FFmpeg音视频工具（交互式向导）
-awesome-tools ffmpeg --wizard
+# 🎬 FFmpeg音视频工具（交互式向导）
+ats ff --wizard                     # 代替 awesome-tools ffmpeg --wizard
 
-# 快速抽取视频帧
-awesome-tools ffmpeg --extractFrames video.mp4 --interval 5 --format png
+# 🖼️ 图片格式转换
+ats ff --convertImage pic.png --format jpg  # 图片转换新功能！
 
-# 生成缩略图
-awesome-tools ffmpeg --thumbnail video.mp4 --time 00:02:30
+# 📱 图片转Base64（自动复制到剪贴板）
+ats ff --imageToBase64 logo.png --clipboard  # 超实用功能！
 
-# 抽取字幕文件
-awesome-tools ffmpeg --extractSubtitles movie.mkv --format srt
+# 🌐 本地分享服务器（交互式向导）
+ats ss --wizard                     # 代替 awesome-tools share-server --wizard
 
-# 本地分享服务器（交互式向导）
-awesome-tools share-server --wizard
+# 📁 分享目录到公网
+ats ss -d ./public --tunnel --no-auth  # 一键分享文件
 
-# 分享本地目录到公网
-awesome-tools share-server -d ./public --tunnel --no-auth
+# 🔗 端口映射：映射本地服务到外网
+ats ss --port-map 3000              # 本地开发服务器瞬间变公网访问
+```
 
-# 端口映射模式：映射本地8000端口到外网
-awesome-tools share-server --port-map 8000
+### 💎 命令对照表
+
+| 功能 | 完整命令 | 🔥 缩写命令 | 节省 |
+|------|----------|------------|------|
+| Git统计 | `awesome-tools git-stats` | `ats gs` | **75%** |
+| 代码清理 | `awesome-tools clean-code` | `ats cc` | **73%** |
+| 文件调试 | `awesome-tools debug-file` | `ats df` | **73%** |
+| 音视频工具 | `awesome-tools ffmpeg` | `ats ff` | **77%** |
+| 分享服务器 | `awesome-tools share-server` | `ats ss` | **75%** |
+
+### 🌟 经典使用场景
+
+```bash
+# 🚀 开发效率场景
+ats gs --since "1 week ago"         # 快速查看一周代码统计
+ats cc -d . --dry-run                # 预览项目死代码
+ats ff --wizard                     # 启动音视频转换向导
+ats ss --port-map 3000              # 本地服务一键公网分享
+
+# 📊 Git分析场景  
+ats gs -a "张三" --since "1 month ago"  # 分析指定作者贡献
+ats gs -e "*.lock,node_modules/*"    # 排除特定文件类型
+
+# 🧹 代码清理场景
+ats cc -d ./vue-project --runtime    # 运行时扫描检测
+ats cc -d ./project --analyze-runtime # 分析运行时数据
+
+# 🎬 媒体处理场景
+ats ff --convert video.avi --format mp4  # 视频格式转换
+ats ff --imageToBase64 logo.png --clipboard  # 图片转Base64
+
+# 🌐 文件分享场景
+ats ss -d ./docs --tunnel            # 分享文档到公网
+ats ss --port-map 8080               # 映射API服务
 ```
 
 ## 📊 功能演示
@@ -158,12 +203,13 @@ awesome-tools share-server --port-map 8000
 
 ## 📖 命令详解
 
-### Git Stats - Git统计分析
+### Git Stats (gs) - Git统计分析
 
 分析Git仓库的提交历史，生成详细的统计报告。
 
 ```bash
-awesome-tools git-stats [选项]
+ats gs [选项]                    # 🔥 推荐缩写命令
+# 或: awesome-tools git-stats [选项]  # 完整命令
 
 选项:
   -d, --dir <path>          Git目录路径 (默认: .)
@@ -179,12 +225,13 @@ awesome-tools git-stats [选项]
 - 📅 每日活跃度分析和可视化图表
 - 🚫 自动排除merge提交和指定文件类型
 
-### Clean Code - Vue项目死代码清理
+### Clean Code (cc) - Vue项目死代码清理
 
 智能分析Vue+Vite项目，识别并清理未使用的文件和导出。
 
 ```bash
-awesome-tools clean-code -d <项目目录> [选项]
+ats cc -d <项目目录> [选项]           # 🔥 推荐缩写命令
+# 或: awesome-tools clean-code -d <项目目录> [选项]  # 完整命令
 
 必需选项:
   -d, --dir <path>          前端项目根目录路径
@@ -210,12 +257,13 @@ awesome-tools clean-code -d <项目目录> [选项]
 - 🔧 **配置解析** - 自动解析Vite/Vue CLI的别名和扩展名配置
 - 💾 **安全备份** - 自动备份，支持一键恢复
 
-### Debug File - 文件引用调试
+### Debug File (df) - 文件引用调试
 
 深入分析特定文件的引用关系，帮助理解为什么文件被标记为死代码。
 
 ```bash
-awesome-tools debug-file -d <项目目录> -f <目标文件> -r <引用文件>
+ats df -d <项目目录> -f <目标文件> -r <引用文件>  # 🔥 推荐缩写命令
+# 或: awesome-tools debug-file -d <项目目录> -f <目标文件> -r <引用文件>  # 完整命令
 
 必需选项:
   -d, --dir <path>     前端项目根目录路径
@@ -264,16 +312,21 @@ awesome-tools debug-file -d <项目目录> -f <目标文件> -r <引用文件>
 📊 引用链完整: UserCard ← Profile ← Router/Layout
 ```
 
-### FFmpeg - 完整音视频处理套件
+### FFmpeg (ff) - 完整音视频处理套件
 
 强大的FFmpeg音视频处理工具，支持格式转换、媒体分析、流媒体服务等完整功能。
+**新增图片处理功能：格式转换、Base64编码、剪贴板集成！**
 
 ```bash
-awesome-tools ffmpeg [选项]
+ats ff [选项]                        # 🔥 推荐缩写命令
+# 或: awesome-tools ffmpeg [选项]        # 完整命令
 
 🎯 主要功能:
   -w, --wizard                  启动交互式功能向导
   --convert <file>              转换视频/音频文件
+  --convertImage <file>         🆕 转换图片格式 (jpg/png/webp/gif/bmp)
+  --imageToBase64 <file>        🆕 图片转Base64编码
+  --base64ToImage <data>        🆕 Base64转图片
   --extractFrames <file>        从视频中抽取帧画面
   --thumbnail <file>            生成视频缩略图
   --extractSubtitles <file>     抽取内嵌字幕文件
@@ -293,6 +346,8 @@ awesome-tools ffmpeg [选项]
 ⚙️ 参数选项:
   --output <dir>               输出目录
   --format <fmt>               输出格式 (mp4/avi/mkv/mp3/jpg/png/srt等)
+  --clipboard                  🆕 Base64结果复制到剪贴板
+  --name <name>                🆕 Base64转图片时的输出文件名
   --interval <sec>             抽帧时间间隔 (默认:10秒)
   --time <time>                缩略图时间位置 (格式:00:02:30)
   --resolution <size>          输出分辨率 (如:1920x1080)
@@ -305,7 +360,8 @@ awesome-tools ffmpeg [选项]
 **功能特性:**
 - 🚀 **自动FFmpeg管理** - 自动下载、安装、更新FFmpeg，无需手动配置
 - 🎬 **格式转换** - 支持几十种音视频格式互转，智能参数优化
-- 🖼️ **视频抽帧** - 按时间间隔、帧数或指定时间点批量抽取视频帧
+- 🖼️ **图片处理** - 🆕 格式转换、Base64编码/解码、剪贴板集成
+- 🎨 **视频抽帧** - 按时间间隔、帧数或指定时间点批量抽取视频帧
 - 🎬 **缩略图生成** - 智能生成视频预览图，支持多点采样和自定义分辨率
 - 📝 **字幕处理** - 抽取内嵌字幕，支持SRT/ASS/VTT格式，多轨道智能识别
 - 🔊 **音频处理** - 从视频提取音频，支持多种音频格式和质量选项
@@ -321,50 +377,56 @@ awesome-tools ffmpeg [选项]
 
 ```bash
 # 🎯 交互式向导（推荐新手使用）
-awesome-tools ffmpeg --wizard
+ats ff --wizard                                 # 🔥 缩写命令
 
 # 📊 系统管理
-awesome-tools ffmpeg --status                    # 检查FFmpeg状态
-awesome-tools ffmpeg --update                    # 更新到最新版本
+ats ff --status                                 # 检查FFmpeg状态
+ats ff --update                                 # 更新到最新版本
+
+# 🖼️ 图片处理 (新功能!)
+ats ff --convertImage photo.png --format jpg    # 图片格式转换
+ats ff --imageToBase64 logo.png --clipboard     # 转Base64并复制到剪贴板
+ats ff --base64ToImage "iVBORw0KG..." --name result.png  # Base64转图片
 
 # 🎬 视频/音频格式转换
-awesome-tools ffmpeg --convert video.avi --format mp4 --output converted
-awesome-tools ffmpeg --convert audio.wav --format mp3 --quality 320k
+ats ff --convert video.avi --format mp4 --output converted
+ats ff --convert audio.wav --format mp3 --quality 320k
 
 # 🖼️ 视频抽帧
-awesome-tools ffmpeg --extractFrames video.mp4 --interval 5 --format png
-awesome-tools ffmpeg --extractFrames movie.mp4 --time 00:01:30,00:02:45,00:05:20
+ats ff --extractFrames video.mp4 --interval 5 --format png
+ats ff --extractFrames movie.mp4 --time 00:01:30,00:02:45,00:05:20
 
 # 🎬 缩略图生成
-awesome-tools ffmpeg --thumbnail video.mp4 --time 00:02:30 --resolution 1920x1080
-awesome-tools ffmpeg --thumbnail video.mp4 --time 00:01:00 --format png
+ats ff --thumbnail video.mp4 --time 00:02:30 --resolution 1920x1080
+ats ff --thumbnail video.mp4 --time 00:01:00 --format png
 
 # 📝 字幕抽取
-awesome-tools ffmpeg --extractSubtitles movie.mkv --format srt --track 0
-awesome-tools ffmpeg --extractSubtitles series.mp4 --format ass --output subtitles
+ats ff --extractSubtitles movie.mkv --format srt --track 0
+ats ff --extractSubtitles series.mp4 --format ass --output subtitles
 
 # 🔊 音频处理
-awesome-tools ffmpeg --extractAudio video.mp4 --format mp3 --quality 192k
-awesome-tools ffmpeg --extractAudio concert.mkv --format flac --output audio
+ats ff --extractAudio video.mp4 --format mp3 --quality 192k
+ats ff --extractAudio concert.mkv --format flac --output audio
 
 # 🗜️ 视频压缩
-awesome-tools ffmpeg --compress large.mp4 --crf 23 --preset medium --resolution 1280x720
-awesome-tools ffmpeg --compress movie.avi --crf 18 --preset slow
+ats ff --compress large.mp4 --crf 23 --preset medium --resolution 1280x720
+ats ff --compress movie.avi --crf 18 --preset slow
 
 # ℹ️ 媒体信息查看
-awesome-tools ffmpeg --info video.mp4            # 查看详细媒体信息
+ats ff --info video.mp4                         # 查看详细媒体信息
 
 # 📦 批量处理和流媒体
-awesome-tools ffmpeg --batch                     # 批量转换向导
-awesome-tools ffmpeg --stream                    # 流媒体服务器向导
+ats ff --batch                                  # 批量转换向导
+ats ff --stream                                 # 流媒体服务器向导
 ```
 
-### Share Server - 本地目录分享和端口映射
+### Share Server (ss) - 本地目录分享和端口映射
 
 快速将本地目录分享为网站或者将本地端口映射到公网访问。
 
 ```bash
-awesome-tools share-server [选项]
+ats ss [选项]                        # 🔥 推荐缩写命令
+# 或: awesome-tools share-server [选项]  # 完整命令
 
 🎯 主要功能:
   -w, --wizard                  启动交互式配置向导
@@ -401,30 +463,30 @@ awesome-tools share-server [选项]
 
 ```bash
 # 🎯 交互式向导（推荐）
-awesome-tools share-server --wizard
+ats ss --wizard                                # 🔥 缩写命令
 
 # 📁 文件分享模式
 # 分享当前目录，启用认证和公网访问
-awesome-tools share-server -d . --tunnel
+ats ss -d . --tunnel
 
 # 分享指定目录，免密访问，仅局域网
-awesome-tools share-server -d ./public --no-auth --port 8080
+ats ss -d ./public --no-auth --port 8080
 
 # 分享目录到公网，自定义认证信息
-awesome-tools share-server -d ./files --tunnel -u myuser --password mypass
+ats ss -d ./files --tunnel -u myuser --password mypass
 
 # 高级配置：自定义MIME类型和上传限制
-awesome-tools share-server -d ./docs --tunnel --custom-mime "md:text/markdown,log:text/plain" --max-upload 50MB
+ats ss -d ./docs --tunnel --custom-mime "md:text/markdown,log:text/plain" --max-upload 50MB
 
 # 🔗 端口映射模式
-# 映射本地Web服务到公网
-awesome-tools share-server --port-map 3000
+# 映射本地Web服务到公网 (开发神器!)
+ats ss --port-map 3000                         # React/Vue开发服务器瞬间上公网
 
 # 映射本地API服务到公网
-awesome-tools share-server --port-map 8080
+ats ss --port-map 8080                         # 后端API接口测试利器
 
-# 映射本地数据库端口（谨慎使用）
-awesome-tools share-server --port-map 5432
+# 映射其他服务端口（谨慎使用）
+ats ss --port-map 5432                         # 数据库等服务
 ```
 
 ### 📱 Share Server 向导界面示例
@@ -511,16 +573,19 @@ Awesome Tools 提供强大的命令历史记录功能：
 
 ### 查看历史
 ```bash
-# 只输入命令名显示帮助和历史记录
-awesome-tools git-stats
-awesome-tools clean-code
+# 只输入命令名显示帮助和历史记录 (支持缩写)
+ats gs              # 或 awesome-tools git-stats
+ats cc              # 或 awesome-tools clean-code
+ats ff              # 或 awesome-tools ffmpeg
+ats ss              # 或 awesome-tools share-server
 ```
 
 ### 快速执行历史命令
 ```bash
-# 执行第1条历史命令
-awesome-tools git-stats 1
-awesome-tools clean-code 3
+# 执行第1条历史命令 (支持缩写)
+ats gs 1            # 或 awesome-tools git-stats 1
+ats cc 3            # 或 awesome-tools clean-code 3
+ats ff 2            # 或 awesome-tools ffmpeg 2
 ```
 
 ### 📚 历史记录界面示例
@@ -607,7 +672,7 @@ sequenceDiagram
     participant B as 浏览器
     participant S as 存储
 
-    U->>T: awesome-tools clean-code --runtime
+    U->>T: ats cc --runtime (缩写命令)
     T->>V: 注入跟踪脚本到main.js
     T->>U: 📝 注入完成，请启动应用
     U->>V: npm run dev
@@ -616,7 +681,7 @@ sequenceDiagram
     V->>S: 记录组件使用数据
     V->>S: 记录方法调用数据
     V->>S: 记录路由访问数据
-    U->>T: awesome-tools clean-code --analyze-runtime
+    U->>T: ats cc --analyze-runtime (缩写命令)
     T->>S: 读取使用数据
     T->>U: 📊 生成运行时分析报告
 ```
@@ -663,7 +728,7 @@ sequenceDiagram
     participant F as FFmpeg
     participant S as 文件系统
     
-    U->>T: awesome-tools ffmpeg --wizard
+    U->>T: ats ff --wizard (缩写命令)
     T->>T: 检查FFmpeg状态
     alt FFmpeg未安装
         T->>U: 提示下载安装
@@ -695,7 +760,8 @@ Clean Code 工具支持运行时扫描，识别静态分析无法检测的动态
 
 ### 1. 注入跟踪脚本
 ```bash
-awesome-tools clean-code -d /path/to/vue/project --runtime
+ats cc -d /path/to/vue/project --runtime        # 🔥 缩写命令
+# 或: awesome-tools clean-code -d /path/to/vue/project --runtime
 ```
 
 ### 2. 运行应用并正常使用
@@ -703,7 +769,8 @@ awesome-tools clean-code -d /path/to/vue/project --runtime
 
 ### 3. 分析收集的数据
 ```bash
-awesome-tools clean-code -d /path/to/vue/project --analyze-runtime
+ats cc -d /path/to/vue/project --analyze-runtime  # 🔥 缩写命令
+# 或: awesome-tools clean-code -d /path/to/vue/project --analyze-runtime
 ```
 
 **支持的技术栈:**
@@ -757,6 +824,15 @@ awesome-tools/
 5. 打开一个 Pull Request
 
 ## 📝 更新日志
+
+### v1.4.0
+- ⚡ 新增超简洁缩写命令系统 - 主程序缩写`ats`，所有子命令支持别名(gs/cc/df/ff/ss)
+- 🖼️ 新增FFmpeg图片处理功能 - 支持图片格式转换、Base64编码/解码、剪贴板集成
+- 🎯 新增交互式图片处理向导 - 在FFmpeg向导中增加图片转换选项
+- 📋 增强剪贴板支持 - Base64结果自动复制，支持从剪贴板读取数据
+- 🎨 完善图片格式支持 - JPG/PNG/WebP/GIF/BMP/TIFF全格式兼容
+- 📖 全面更新文档 - 主推缩写命令，平均节省75%输入量
+- 🔧 优化命令历史记录 - 别名和全名完全兼容
 
 ### v1.3.0
 - 🌐 新增Share Server本地分享服务器 - 快速分享本地目录或映射端口到公网
