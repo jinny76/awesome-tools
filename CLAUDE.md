@@ -88,9 +88,11 @@ awesome_tools/
 │       ├── screensaver.md     # Screensaver documentation
 │       └── notify.md          # Server酱 Notify documentation
 ├── mcp/                       # MCP Server for Claude Desktop
-│   ├── server.js              # MCP Server implementation
-│   ├── package.json           # MCP package configuration
-│   └── README.md              # MCP setup and usage guide
+│   ├── server.js              # 标准MCP服务器实现（使用官方SDK）
+│   ├── package.json           # MCP服务器依赖配置
+│   ├── package-lock.json      # 依赖锁定文件
+│   ├── node_modules/          # MCP SDK依赖包
+│   └── README.md              # 完整MCP配置和使用指南
 ├── package.json               # Project config with binary definition
 ├── package-lock.json          # Dependency lock file
 ├── README.md                  # Main project documentation (simplified)
@@ -132,6 +134,15 @@ ats rs redis                 # Connect to Redis service
 - No SSH key management complexity
 
 ## Key Features
+
+### MCP Server Integration (`mcp/server.js`)
+标准的Model Context Protocol服务器实现，为Claude Desktop提供原生工具支持：
+- **Server酱推送** (`serverchan_send`) - 发送通知到微信等平台
+- **Git统计分析** (`git_stats_analyze`) - 深度分析Git提交历史
+- **Vue死代码清理** (`clean_code_analyze`) - 智能检测Vue项目死代码
+- **Stdio通信** - 通过stdin/stdout进行JSON-RPC通信
+- **CLI集成** - 调用现有CLI命令保持功能一致性
+- **易于调试** - 支持手动测试和验证
 
 ### Git Statistics Analysis (`git-stats`)
 The main feature is comprehensive Git repository analysis with options for:
@@ -287,4 +298,23 @@ ats screen -t logs --speed 500
 - **Single-file architecture** suitable for current scale but may need refactoring as commands grow
 - **Chinese localization** throughout user-facing text
 - Complex git analysis logic in `generateGitStats()` function (bin/cli.js:123-438)
-- 当超过三分钟的任务完成了, 通过mcp发送消息到serverchan, 内容是"CC任务完成" 
+- 当超过三分钟的任务完成了, 通过mcp发送消息到serverchan, 内容是"CC任务完成"
+
+### MCP Server Usage
+配置和使用MCP服务器的说明：
+
+```bash
+# 添加MCP服务器到Claude Desktop
+claude mcp add awesome-tools -- node /path/to/awesome-tools/mcp/server.js
+
+# 验证服务器状态
+claude mcp list
+
+# 手动测试服务器通信
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | node mcp/server.js
+```
+
+**在Claude Desktop中使用：**
+- "发送一条部署完成通知到微信"
+- "分析当前项目最近一个月的Git提交统计"
+- "检测Vue项目中的死代码并生成清理报告" 

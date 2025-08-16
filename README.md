@@ -31,25 +31,52 @@ ats --help
 
 ## 🤖 AI IDE 原生集成
 
-Awesome Tools 支持 MCP (Model Context Protocol) 协议，可直接集成到 Claude Desktop 和 Cursor 中：
+Awesome Tools 提供标准 MCP (Model Context Protocol) 服务器，可直接集成到 Claude Desktop 和 Cursor 中：
 
+```bash
+# 一键添加MCP服务器
+claude mcp add awesome-tools -- node path/to/awesome-tools/mcp/server.js
+```
+
+**手动配置 Claude Desktop：**
 ```json
 {
   "mcpServers": {
-    "awesome-tools-notify": {
+    "awesome-tools": {
       "command": "node",
-      "args": ["path/to/awesome-tools/mcp/notify.js"]
+      "args": ["path/to/awesome-tools/mcp/server.js"],
+      "env": {"NODE_ENV": "production"}
     }
   }
 }
 ```
 
-**在 Claude Desktop 中使用：**
-- 💬 "发送一条部署完成通知"
-- 📊 "分析当前项目的Git提交统计" 
-- 🧹 "清理Vue项目中的死代码"
+**验证服务器状态：**
+```bash
+# 检查MCP服务器连接
+claude mcp list
 
-👉 [完整MCP配置指南](mcp/README.md)
+# 手动测试服务器通信
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}' | node path/to/mcp/server.js
+```
+
+**在 Claude Desktop 中使用：**
+- 💬 "发送一条部署完成通知到微信"
+- 📊 "分析当前项目最近一个月的Git提交统计" 
+- 🧹 "检测Vue项目中的死代码并生成清理报告"
+
+**支持的MCP工具：**
+- `serverchan_send` - Server酱推送通知
+- `git_stats_analyze` - Git统计分析  
+- `clean_code_analyze` - Vue死代码清理
+
+**MCP服务器特点：**
+- 🔧 **标准协议** - 使用官方MCP SDK，完全兼容Claude Desktop
+- 📡 **Stdio通信** - 通过stdin/stdout进行JSON-RPC通信
+- 🛠️ **CLI集成** - 调用现有CLI命令，保持功能一致性
+- 🔍 **易于调试** - 支持手动测试和验证
+
+👉 [完整MCP服务器配置指南](mcp/README.md)
 
 ## 📚 详细文档
 

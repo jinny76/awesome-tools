@@ -1,6 +1,6 @@
 # Git Stats (gs) - Git统计分析工具
 
-Git仓库提交历史的深度分析工具，生成详细的统计报告和可视化图表。支持MCP集成，可在Claude Desktop和Cursor中直接使用。
+Git仓库提交历史的深度分析工具，生成详细的统计报告和可视化图表。支持MCP服务器集成，可在Claude Desktop中通过`git_stats_analyze`工具直接使用。
 
 ## 快速开始
 

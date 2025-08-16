@@ -1,6 +1,6 @@
 # Clean Code (cc) - Vue项目死代码清理工具
 
-智能分析Vue+Vite项目，识别并清理未使用的文件、导出和路由。支持静态分析和运行时扫描双重检测。支持MCP集成，可在Claude Desktop和Cursor中直接使用。
+智能分析Vue+Vite项目，识别并清理未使用的文件、导出和路由。支持静态分析和运行时扫描双重检测。支持MCP服务器集成，可在Claude Desktop中通过`clean_code_analyze`工具直接使用。
 
 ## 快速开始
 

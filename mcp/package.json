@@ -1,0 +1,20 @@
+{
+  "name": "awesome-tools-mcp-server",
+  "version": "1.0.0",
+  "description": "Awesome Tools MCP Server for Claude Desktop integration",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --inspect server.js"
+  },
+  "keywords": ["mcp", "claude", "server酱", "git-stats", "awesome-tools"],
+  "author": "Awesome Tools",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

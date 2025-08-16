@@ -128,31 +128,46 @@ ats n -t "重要通知" --channel "personal,work"
 ats n -t "紧急通知" -d "服务器宕机" --channel "*"
 ```
 
-### 6. MCP集成使用
+### 6. MCP服务器集成
 
-配置完成后，可在AI IDE中直接使用：
+Awesome Tools提供标准MCP服务器，支持在Claude Desktop中直接使用Server酱推送功能。
 
-**Claude Desktop:**
+**配置MCP服务器：**
+```bash
+# 一键添加MCP服务器
+claude mcp add awesome-tools -- node path/to/awesome-tools/mcp/server.js
+
+# 检查服务器状态
+claude mcp list
 ```
-发送一条服务器告警通知，CPU使用率达到95%，内存使用率80%
 
-请发送项目部署完成通知，包含版本号v2.1.0和部署时间
+**在Claude Desktop中使用：**
+```
+发送一条服务器告警通知，标题是"CPU使用率过高"，内容包含当前时间和详细信息
 
-创建一个Markdown格式的状态报告通知
+请发送项目部署完成通知，包含版本号v2.1.0和部署时间，使用Markdown格式
+
+创建一个系统状态报告通知，添加"系统监控|自动化"标签
 ```
 
-**Cursor:**
+**MCP工具参数：**
+- **工具名称**: `serverchan_send`
+- **title** (必需): 消息标题
+- **description** (可选): 消息内容，支持Markdown格式
+- **tags** (可选): 消息标签，用|分隔
+
+**在Cursor中使用：**
 ```
-@mcp 发送构建完成通知
+@mcp 使用serverchan_send发送构建完成通知
 
 @mcp 发送服务器状态报告，包含系统信息
 
-@mcp 发送紧急告警，数据库连接失败
+@mcp 发送紧急告警：数据库连接失败
 ```
 
-**独立MCP脚本:**
+**独立MCP脚本（兼容性）:**
 ```bash
-# 直接调用MCP脚本
+# 直接调用MCP脚本（旧版本兼容）
 node mcp/notify.js "测试标题" "测试内容" "测试|标签"
 
 # 查看配置状态
