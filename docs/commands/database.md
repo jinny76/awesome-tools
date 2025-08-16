@@ -290,6 +290,19 @@ claude mcp add awesome-tools -- node path/to/awesome-tools/mcp/server.js
 **数据分析：**
 ```
 分析用户注册趋势，按月统计最近6个月的新用户数量
+查询2017年北京地区的销售金额统计
+```
+
+**实际使用示例（基于demo表）：**
+```
+# 查询2017年北京的销售数据
+SELECT COUNT(*) as 订单数量, SUM(amount) as 总销售金额, AVG(amount) as 平均订单金额, SUM(profit) as 总利润 
+FROM demo WHERE city = '北京' AND order_date LIKE '2017%'
+
+# 查看销售TOP 5大单
+SELECT order_date, customer_name, pruduct_name, amount, profit 
+FROM demo WHERE city = '北京' AND order_date LIKE '2017%' 
+ORDER BY amount DESC LIMIT 5
 ```
 
 **性能监控：**
