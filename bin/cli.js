@@ -9,6 +9,7 @@ const { startShareServer } = require('../lib/commands/share-server');
 const { startScreensaver } = require('../lib/commands/screensaver');
 const { startNotify } = require('../lib/commands/server-chan');
 const { startDatabase } = require('../lib/commands/database');
+const { startAnimationServer } = require('../lib/commands/animation-server');
 const CommandHistory = require('../lib/utils/command-history');
 
 const program = new Command();
@@ -275,6 +276,33 @@ program
     }
   }));
 
+
+program
+  .command('animation-server')
+  .alias('as')
+  .description('3D动画服务器：WebSocket服务器，连接网页和MCP，提供场景分析和优化服务')
+  .option('-p, --port <port>', '服务器端口', '8080')
+  .option('-h, --host <host>', '服务器主机', 'localhost')
+  .option('--auth', '启用认证')
+  .option('--token <token>', '认证令牌')
+  .option('--cors', '启用CORS', true)
+  .option('--max-connections <num>', '最大连接数', '100')
+  .option('--data-dir <path>', '数据存储目录')
+  .option('--mcp-bridge', '启用MCP桥接', true)
+  .option('--background', '后台运行')
+  .option('--verbose', '详细输出')
+  .action(wrapAction('animation-server', async (options) => {
+    try {
+      await startAnimationServer(options);
+    } catch (error) {
+      console.error('❌ 错误:', error.message);
+      if (error.stack && options.debug) {
+        console.error(error.stack);
+      }
+      process.exit(1);
+    }
+  }));
+
 // 将驼峰命名转换为连字符命名
 function convertToKebabCase(str) {
   return str.replace(/([A-Z])/g, '-$1').toLowerCase();
@@ -290,7 +318,9 @@ function getCommandAlias() {
     'ss': 'share-server',
     'rs': 'remote-server',
     'screen': 'screensaver',
-    'n': 'notify'
+    'n': 'notify',
+    'db': 'database',
+    'as': 'animation-server'
   };
 }
 
@@ -302,7 +332,7 @@ function getFullCommandName(commandName) {
 
 // 获取所有有效命令（包括别名）
 function getAllValidCommands() {
-  const fullCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server', 'remote-server', 'screensaver', 'notify'];
+  const fullCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server', 'remote-server', 'screensaver', 'notify', 'database', 'animation-server'];
   const aliases = Object.keys(getCommandAlias());
   return [...fullCommands, ...aliases];
 }
@@ -339,7 +369,9 @@ async function executeHistoryCommand(commandName, historyIndex) {
       'ffmpeg': handleFFmpegCommand,
       'share-server': startShareServer,
       'screensaver': startScreensaver,
-      'notify': startNotify
+      'notify': startNotify,
+      'database': startDatabase,
+      'animation-server': startAnimationServer
     };
     
     const commandFunction = commandMap[commandName];
