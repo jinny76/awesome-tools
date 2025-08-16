@@ -22,8 +22,7 @@ ats --help
 |------|------|------|
 | **Git统计** | `ats gs` | 分析代码提交历史，生成可视化报告 |
 | **死代码清理** | `ats cc -d .` | 智能清理Vue项目未使用代码 |
-| **3D场景分析** | `ats sa -f scene.babylon` | 多引擎3D场景分析、动画服务器集成 |
-| **动画服务器** | `ats as --port 8080` | WebSocket服务器，连接网页和MCP桥梁 |
+| **动画服务器** | `ats as --port 8081` | 翠鸟3D引擎WebSocket服务器，支持场景检查与MCP集成 |
 | **FFmpeg工具** | `ats ff --wizard` | 音视频处理、格式转换、流媒体 |
 | **文件分享** | `ats ss --tunnel` | 一键分享本地文件到公网 |
 | **端口映射** | `ats ss --port-map 3000` | 本地服务映射到公网访问 |
@@ -98,7 +97,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 
 - 📊 [Git Stats](docs/commands/git-stats.md) - Git仓库统计分析
 - 🧹 [Clean Code](docs/commands/clean-code.md) - Vue项目死代码清理
-- 🎯 [Scene Analyzer](docs/commands/scene-analyzer.md) - 3D场景分析与动画服务器集成
+- 🎯 [Kingfisher Scene Inspector](docs/commands/kingfisher-scene-inspector.md) - 翠鸟3D引擎场景检查与设备分类
 - 🎬 [FFmpeg](docs/commands/ffmpeg.md) - 完整音视频处理套件
 - 🌐 [Share Server](docs/commands/share-server.md) - 本地分享与端口映射
 - 💻 [Screensaver](docs/commands/screensaver.md) - 工作伪装屏保工具
@@ -118,6 +117,9 @@ ats cc -d ./vue-project --dry-run
 
 # 连接数据库查询用户数据
 ats db --config dev -q "SELECT COUNT(*) FROM users WHERE active = 1"
+
+# 启动翠鸟场景检查服务器
+ats as --port 8081
 
 # 分享本地开发服务
 ats ss --port-map 3000
