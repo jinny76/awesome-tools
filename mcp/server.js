@@ -129,6 +129,67 @@ class AwesomeToolsMCPServer {
               },
               required: ["dir"]
             }
+          },
+          {
+            name: "database_query",
+            description: "执行数据库查询，支持MySQL和PostgreSQL",
+            inputSchema: {
+              type: "object",
+              properties: {
+                type: {
+                  type: "string",
+                  description: "数据库类型",
+                  enum: ["mysql", "postgres"],
+                  default: "mysql"
+                },
+                host: {
+                  type: "string",
+                  description: "数据库主机",
+                  default: "localhost"
+                },
+                port: {
+                  type: "number",
+                  description: "数据库端口"
+                },
+                user: {
+                  type: "string",
+                  description: "用户名"
+                },
+                password: {
+                  type: "string",
+                  description: "密码"
+                },
+                database: {
+                  type: "string",
+                  description: "数据库名"
+                },
+                query: {
+                  type: "string",
+                  description: "SQL查询语句"
+                },
+                config: {
+                  type: "string",
+                  description: "使用保存的配置名称"
+                },
+                action: {
+                  type: "string",
+                  description: "操作类型",
+                  enum: ["query", "tables", "describe", "test"],
+                  default: "query"
+                },
+                tableName: {
+                  type: "string",
+                  description: "表名（用于describe操作）"
+                },
+                format: {
+                  type: "string",
+                  description: "输出格式",
+                  enum: ["table", "json", "csv"],
+                  default: "table"
+                }
+              },
+              required: []
+            }
           }
         ]
       };
@@ -148,6 +209,9 @@ class AwesomeToolsMCPServer {
           
           case "clean_code_analyze":
             return await this.handleCleanCodeAnalyze(args);
+          
+          case "database_query":
+            return await this.handleDatabaseQuery(args);
           
           default:
             throw new Error(`Unknown tool: ${name}`);
@@ -286,6 +350,92 @@ class AwesomeToolsMCPServer {
           {
             type: "text",
             text: `❌ 死代码分析失败：${error.message}\\n\\n请确保：\\n1. 目录是Vue项目\\n2. 包含package.json文件\\n3. 项目依赖完整`
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+
+  /**
+   * 处理数据库查询
+   */
+  async handleDatabaseQuery(args) {
+    const {
+      type = 'mysql',
+      host = 'localhost',
+      port,
+      user,
+      password,
+      database,
+      query,
+      config,
+      action = 'query',
+      tableName,
+      format = 'table'
+    } = args;
+
+    try {
+      // 构建数据库命令
+      let cmd = `ats db`;
+      
+      if (config) {
+        cmd += ` --config "${config}"`;
+      } else {
+        cmd += ` --type "${type}"`;
+        cmd += ` --host "${host}"`;
+        if (port) cmd += ` --port ${port}`;
+        if (user) cmd += ` --user "${user}"`;
+        if (password) cmd += ` --password "${password}"`;
+        if (database) cmd += ` --database "${database}"`;
+      }
+
+      // 根据操作类型添加参数
+      switch (action) {
+        case 'query':
+          if (!query) {
+            throw new Error('查询操作需要提供SQL语句');
+          }
+          cmd += ` --query "${query}"`;
+          if (format !== 'table') {
+            cmd += ` --export "${format}"`;
+          }
+          break;
+        case 'tables':
+          cmd += ' --tables';
+          break;
+        case 'describe':
+          if (!tableName) {
+            throw new Error('describe操作需要提供表名');
+          }
+          cmd += ` --describe "${tableName}"`;
+          break;
+        case 'test':
+          cmd += ' --test';
+          break;
+        default:
+          throw new Error(`不支持的操作类型: ${action}`);
+      }
+      
+      const result = execSync(cmd, { 
+        encoding: 'utf8',
+        maxBuffer: 1024 * 1024 * 10
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `🗄️ 数据库${action}操作完成\\n\\n\`\`\`\\n${result}\\n\`\`\``
+          }
+        ]
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `❌ 数据库操作失败：${error.message}\\n\\n可能的原因：\\n1. 数据库连接参数错误\\n2. 数据库服务未启动\\n3. 权限不足\\n4. SQL语法错误`
           }
         ],
         isError: true

@@ -27,6 +27,7 @@ ats --help
 | **端口映射** | `ats ss --port-map 3000` | 本地服务映射到公网访问 |
 | **工作屏保** | `ats screen -w` | 专业的工作状态伪装工具 |
 | **消息推送** | `ats n -t "标题"` | Server酱推送通知到微信 |
+| **数据库查询** | `ats db -w` | MySQL/PostgreSQL数据库连接查询 |
 | **MCP集成** | `mcp/` | Claude Desktop/Cursor原生集成 |
 
 ## 🤖 AI IDE 原生集成
@@ -64,11 +65,13 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 - 💬 "发送一条部署完成通知到微信"
 - 📊 "分析当前项目最近一个月的Git提交统计" 
 - 🧹 "检测Vue项目中的死代码并生成清理报告"
+- 🗄️ "查询用户表中的活跃用户数量"
 
 **支持的MCP工具：**
 - `serverchan_send` - Server酱推送通知
 - `git_stats_analyze` - Git统计分析  
 - `clean_code_analyze` - Vue死代码清理
+- `database_query` - 数据库连接查询
 
 **MCP服务器特点：**
 - 🔧 **标准协议** - 使用官方MCP SDK，完全兼容Claude Desktop
@@ -88,6 +91,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 - 🌐 [Share Server](docs/commands/share-server.md) - 本地分享与端口映射
 - 💻 [Screensaver](docs/commands/screensaver.md) - 工作伪装屏保工具
 - 📱 [Notify](docs/commands/notify.md) - Server酱消息推送服务
+- 🗄️ [Database](docs/commands/database.md) - 数据库连接查询工具
 - 🤖 [MCP集成](mcp/README.md) - Claude Desktop/Cursor原生集成
 
 ## 🚀 典型使用场景
@@ -99,6 +103,9 @@ ats gs --since "1 week ago"
 
 # 清理项目死代码
 ats cc -d ./vue-project --dry-run
+
+# 连接数据库查询用户数据
+ats db --config dev -q "SELECT COUNT(*) FROM users WHERE active = 1"
 
 # 分享本地开发服务
 ats ss --port-map 3000

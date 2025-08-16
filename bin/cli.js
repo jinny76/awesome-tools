@@ -8,6 +8,7 @@ const { handleFFmpegCommand } = require('../lib/commands/ffmpeg-tools');
 const { startShareServer } = require('../lib/commands/share-server');
 const { startScreensaver } = require('../lib/commands/screensaver');
 const { startNotify } = require('../lib/commands/server-chan');
+const { startDatabase } = require('../lib/commands/database');
 const CommandHistory = require('../lib/utils/command-history');
 
 const program = new Command();
@@ -239,6 +240,37 @@ program
       await startNotify(options);
     } catch (error) {
       console.error('❌ 错误:', error.message);
+      process.exit(1);
+    }
+  }));
+
+program
+  .command('database')
+  .alias('db')
+  .description('数据库连接查询：支持MySQL和PostgreSQL数据库操作')
+  .option('-t, --type <type>', '数据库类型 (mysql/postgres)', 'mysql')
+  .option('-h, --host <host>', '数据库主机', 'localhost')
+  .option('-P, --port <port>', '数据库端口')
+  .option('-u, --user <user>', '用户名')
+  .option('-p, --password <password>', '密码')
+  .option('-d, --database <database>', '数据库名')
+  .option('-q, --query <sql>', 'SQL查询语句')
+  .option('--config <name>', '使用保存的配置')
+  .option('--save <name>', '保存当前配置')
+  .option('--list', '列出保存的配置')
+  .option('--test', '测试数据库连接')
+  .option('-w, --wizard', '启动配置向导')
+  .option('--tables', '列出所有表')
+  .option('--describe <table>', '查看表结构')
+  .option('--export <format>', '导出查询结果 (json/csv/table)')
+  .action(wrapAction('database', async (options) => {
+    try {
+      await startDatabase(options);
+    } catch (error) {
+      console.error('❌ 错误:', error.message);
+      if (error.stack && options.debug) {
+        console.error(error.stack);
+      }
       process.exit(1);
     }
   }));
