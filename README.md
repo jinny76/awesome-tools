@@ -22,6 +22,8 @@ ats --help
 |------|------|------|
 | **Git统计** | `ats gs` | 分析代码提交历史，生成可视化报告 |
 | **死代码清理** | `ats cc -d .` | 智能清理Vue项目未使用代码 |
+| **3D场景分析** | `ats sa -f scene.babylon` | 多引擎3D场景分析、动画服务器集成 |
+| **动画服务器** | `ats as --port 8080` | WebSocket服务器，连接网页和MCP桥梁 |
 | **FFmpeg工具** | `ats ff --wizard` | 音视频处理、格式转换、流媒体 |
 | **文件分享** | `ats ss --tunnel` | 一键分享本地文件到公网 |
 | **端口映射** | `ats ss --port-map 3000` | 本地服务映射到公网访问 |
@@ -66,12 +68,21 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 - 📊 "分析当前项目最近一个月的Git提交统计" 
 - 🧹 "检测Vue项目中的死代码并生成清理报告"
 - 🗄️ "查询用户表中的活跃用户数量"
+- 🎮 "检查翠鸟3D场景中的设备模型信息"
+- 🔧 "隐藏场景中的贴片机设备"
+- ⚡ "对场景执行性能优化策略"
 
 **支持的MCP工具：**
 - `serverchan_send` - Server酱推送通知
 - `git_stats_analyze` - Git统计分析  
 - `clean_code_analyze` - Vue死代码清理
 - `database_query` - 数据库连接查询
+- `scene_inspect` - 翠鸟3D场景实时检查与设备分析
+- `kingfisher_scene_control` - 翠鸟场景对象控制（隐藏/显示/变换）
+- `scene_optimization_strategy` - 智能场景优化策略执行
+- `query_atomic_capabilities` - 查询场景检查器原子操作能力
+- `intelligent_task_decomposition` - 智能任务分解与执行
+- `atomic_operation_history` - 原子操作历史管理与回滚
 
 **MCP服务器特点：**
 - 🔧 **标准协议** - 使用官方MCP SDK，完全兼容Claude Desktop
@@ -86,7 +97,8 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 每个命令都有完整的使用文档：
 
 - 📊 [Git Stats](docs/commands/git-stats.md) - Git仓库统计分析
-- 🧹 [Clean Code](docs/commands/clean-code.md) - Vue项目死代码清理  
+- 🧹 [Clean Code](docs/commands/clean-code.md) - Vue项目死代码清理
+- 🎯 [Scene Analyzer](docs/commands/scene-analyzer.md) - 3D场景分析与动画服务器集成
 - 🎬 [FFmpeg](docs/commands/ffmpeg.md) - 完整音视频处理套件
 - 🌐 [Share Server](docs/commands/share-server.md) - 本地分享与端口映射
 - 💻 [Screensaver](docs/commands/screensaver.md) - 工作伪装屏保工具

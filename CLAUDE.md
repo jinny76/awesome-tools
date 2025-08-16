@@ -6,6 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Node.js CLI toolkit called "awesome_tools" (强大工具集合) - a collection of awesome utility commands built with Commander.js. The project is designed as an extensible command-line interface for executing specific tasks locally.
 
+**Latest Major Update (v2.1.0):** 
+Enhanced Kingfisher 3D Scene Inspector with intelligent device classification, real-time scene analysis, and MCP transparent proxy architecture. See `docs/kingfisher-scene-inspector-feature-update.md` for details.
+
 ## Development Commands
 
 ```bash
@@ -32,6 +35,7 @@ ats --help
 - `share-server` | `ss` [options] - Local directory sharing server with auth and public access
 - `remote-server` | `rs` [options] - SSH tunnel tool for mapping remote server ports to local ports
 - `screensaver` | `screen` [options] - Work disguise screensaver tool with multiple professional scenarios
+- `animation-server` | `as` [options] - 3D animation server with WebSocket support for Kingfisher engine integration
 
 ## Architecture
 
@@ -71,14 +75,17 @@ awesome_tools/
 │   │   ├── ffmpeg-tools.js    # FFmpeg media processor
 │   │   ├── share-server.js    # Local sharing server
 │   │   ├── remote-server.js   # SSH port forwarding
-│   │   └── screensaver.js     # Work disguise screensaver
+│   │   ├── screensaver.js     # Work disguise screensaver
+│   │   └── animation-server.js # 3D animation WebSocket server
 │   └── utils/                 # Utility modules
 │       ├── command-history.js # Command history tracking
 │       ├── file-analyzer.js   # File analysis utilities
 │       ├── dependency-analyzer.js # Dependency graph analysis
 │       ├── router-analyzer.js # Vue Router analysis
 │       ├── runtime-scanner.js # Vue runtime tracking
-│       └── project-config.js  # Project configuration parser
+│       ├── project-config.js  # Project configuration parser
+│       ├── animation-server.js # Animation server utils
+│       └── kingfisher-scene-inspector.js # Kingfisher engine scene inspector
 ├── docs/                      # Documentation
 │   └── commands/              # Individual command docs
 │       ├── git-stats.md       # Git Stats documentation
@@ -86,7 +93,8 @@ awesome_tools/
 │       ├── ffmpeg.md          # FFmpeg documentation
 │       ├── share-server.md    # Share Server documentation
 │       ├── screensaver.md     # Screensaver documentation
-│       └── notify.md          # Server酱 Notify documentation
+│       ├── notify.md          # Server酱 Notify documentation
+│       └── kingfisher-scene-inspector.md # Kingfisher Scene Inspector docs
 ├── mcp/                       # MCP Server for Claude Desktop
 │   ├── server.js              # 标准MCP服务器实现（使用官方SDK）
 │   ├── package.json           # MCP服务器依赖配置
@@ -132,6 +140,28 @@ ats rs redis                 # Connect to Redis service
 - Optional password storage (users can choose not to save passwords)
 - Secure key derivation using scrypt
 - No SSH key management complexity
+
+### Kingfisher Scene Inspector (`lib/utils/kingfisher-scene-inspector.js`)
+专为翠鸟(Kingfisher)3D引擎设计的实时场景分析和优化工具，通过分析 `window.scene` 对象提供场景检索、分析和优化功能。
+
+**核心功能:**
+- **自动连接**: 默认自动连接到动画服务器 (ws://localhost:8080/animation)
+- **实时分析**: 定期分析翠鸟场景对象，监控性能变化
+- **翠鸟特化**: 支持节点、机位、样条等翠鸟引擎特有功能
+- **KPath查询**: 使用翠鸟的KPath系统进行精确的节点查询
+- **SDK集成**: 充分利用翠鸟云SDK和UI组件API
+- **远程优化**: 接收并执行服务器下发的优化命令
+
+**一行代码启动:**
+```javascript
+const inspector = new KingfisherSceneInspector();
+// 自动连接服务器、自动分析场景、零配置！
+```
+
+**支持的查询和优化:**
+- 节点查询: `inspector.query({ nodes: { type: 'TransformNode' } })`
+- 机位切换: `inspector.optimize('focus_camera', { target: 'building1' })`
+- 对象隐藏: `inspector.optimize('hide_objects', { objects: ['obj1', 'obj2'] })`
 
 ## Key Features
 
