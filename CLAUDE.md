@@ -85,7 +85,12 @@ awesome_tools/
 │       ├── clean-code.md      # Clean Code documentation
 │       ├── ffmpeg.md          # FFmpeg documentation
 │       ├── share-server.md    # Share Server documentation
-│       └── screensaver.md     # Screensaver documentation
+│       ├── screensaver.md     # Screensaver documentation
+│       └── notify.md          # Server酱 Notify documentation
+├── mcp/                       # MCP Server for Claude Desktop
+│   ├── server.js              # MCP Server implementation
+│   ├── package.json           # MCP package configuration
+│   └── README.md              # MCP setup and usage guide
 ├── package.json               # Project config with binary definition
 ├── package-lock.json          # Dependency lock file
 ├── README.md                  # Main project documentation (simplified)

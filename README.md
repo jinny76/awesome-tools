@@ -27,6 +27,29 @@ ats --help
 | **端口映射** | `ats ss --port-map 3000` | 本地服务映射到公网访问 |
 | **工作屏保** | `ats screen -w` | 专业的工作状态伪装工具 |
 | **消息推送** | `ats n -t "标题"` | Server酱推送通知到微信 |
+| **MCP集成** | `mcp/` | Claude Desktop/Cursor原生集成 |
+
+## 🤖 AI IDE 原生集成
+
+Awesome Tools 支持 MCP (Model Context Protocol) 协议，可直接集成到 Claude Desktop 和 Cursor 中：
+
+```json
+{
+  "mcpServers": {
+    "awesome-tools-notify": {
+      "command": "node",
+      "args": ["path/to/awesome-tools/mcp/notify.js"]
+    }
+  }
+}
+```
+
+**在 Claude Desktop 中使用：**
+- 💬 "发送一条部署完成通知"
+- 📊 "分析当前项目的Git提交统计" 
+- 🧹 "清理Vue项目中的死代码"
+
+👉 [完整MCP配置指南](mcp/README.md)
 
 ## 📚 详细文档
 
@@ -38,7 +61,7 @@ ats --help
 - 🌐 [Share Server](docs/commands/share-server.md) - 本地分享与端口映射
 - 💻 [Screensaver](docs/commands/screensaver.md) - 工作伪装屏保工具
 - 📱 [Notify](docs/commands/notify.md) - Server酱消息推送服务
-- 🤖 [MCP集成](docs/MCP-INTEGRATION.md) - Claude Desktop集成指南
+- 🤖 [MCP集成](mcp/README.md) - Claude Desktop/Cursor原生集成
 
 ## 🚀 典型使用场景
 
@@ -88,6 +111,8 @@ ats notify --wizard  # 配置SendKey
 
 # 在Claude中直接使用：
 # "请发送服务器告警通知，CPU使用率90%"
+# "分析这个项目最近一个月的Git提交情况"
+# "帮我清理Vue项目中的死代码，先预览一下"
 # "发送项目部署完成的Markdown报告"
 ```
 
@@ -103,6 +128,7 @@ ats notify --wizard  # 配置SendKey
 - **可视化输出** - 图表、进度条、彩色输出
 - **交互式向导** - 新手友好的操作界面
 - **批量处理** - 支持目录级批量操作
+- **AI IDE集成** - 原生支持Claude Desktop和Cursor
 
 ### 🛡️ 安全可靠
 - **自动备份** - 操作前自动创建备份

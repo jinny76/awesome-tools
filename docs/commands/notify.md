@@ -1,6 +1,6 @@
 # Notify (n) - Server酱消息推送
 
-基于Server酱的消息推送工具，支持发送通知到微信、企业微信等平台。支持多SendKey配置和群发功能。
+基于Server酱的消息推送工具，支持发送通知到微信、企业微信等平台。支持多SendKey配置和群发功能。同时支持MCP集成，可在Claude Desktop和Cursor中直接使用。
 
 ## 🚀 快速开始
 
@@ -126,6 +126,37 @@ ats n -t "重要通知" --channel "personal,work"
 
 # 群发到所有通道
 ats n -t "紧急通知" -d "服务器宕机" --channel "*"
+```
+
+### 6. MCP集成使用
+
+配置完成后，可在AI IDE中直接使用：
+
+**Claude Desktop:**
+```
+发送一条服务器告警通知，CPU使用率达到95%，内存使用率80%
+
+请发送项目部署完成通知，包含版本号v2.1.0和部署时间
+
+创建一个Markdown格式的状态报告通知
+```
+
+**Cursor:**
+```
+@mcp 发送构建完成通知
+
+@mcp 发送服务器状态报告，包含系统信息
+
+@mcp 发送紧急告警，数据库连接失败
+```
+
+**独立MCP脚本:**
+```bash
+# 直接调用MCP脚本
+node mcp/notify.js "测试标题" "测试内容" "测试|标签"
+
+# 查看配置状态
+node mcp/notify.js --status
 ```
 
 ## 🔧 高级功能
