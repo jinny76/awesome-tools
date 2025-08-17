@@ -1,0 +1,19 @@
+{
+  "name": "mcp-api-test",
+  "version": "1.0.0",
+  "description": "MCP server for API automated testing",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.6.0",
+    "axios": "^1.6.2",
+    "yaml": "^2.3.4",
+    "uuid": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

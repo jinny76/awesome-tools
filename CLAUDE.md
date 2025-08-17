@@ -36,6 +36,7 @@ ats --help
 - `remote-server` | `rs` [options] - SSH tunnel tool for mapping remote server ports to local ports
 - `screensaver` | `screen` [options] - Work disguise screensaver tool with multiple professional scenarios
 - `animation-server` | `as` [options] - 3D animation server with WebSocket support for Kingfisher engine integration
+- `api-test` | `at` [options] - API automated testing tool with MCP integration for intelligent testing
 
 ## Architecture
 
@@ -173,6 +174,21 @@ const inspector = new KingfisherSceneInspector();
 - **Stdio通信** - 通过stdin/stdout进行JSON-RPC通信
 - **CLI集成** - 调用现有CLI命令保持功能一致性
 - **易于调试** - 支持手动测试和验证
+
+### API Test MCP Server (`mcp-test/server.js`)
+专门用于API自动化测试的独立MCP服务器，与Claude协作进行智能API测试：
+- **环境管理** - 多测试环境配置、切换和管理
+- **Swagger解析** - 自动获取和解析OpenAPI文档
+- **智能认证** - JWT/Session/Basic Auth支持
+- **测试执行** - 单个或批量HTTP请求执行
+- **测试套件** - 测试用例保存、加载和管理
+- **数据库快照** - 测试前后数据库备份恢复
+- **测试上下文** - 动态数据管理（如API返回的ID）
+- **结果分析** - 测试结果存储和统计分析
+
+**职责分工**：
+- **Claude负责**: 智能策略、测试数据生成、结果分析、报告生成
+- **MCP负责**: HTTP执行、数据存储、环境管理、认证处理
 
 ### Git Statistics Analysis (`git-stats`)
 The main feature is comprehensive Git repository analysis with options for:
@@ -347,4 +363,51 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | node mcp/ser
 **在Claude Desktop中使用：**
 - "发送一条部署完成通知到微信"
 - "分析当前项目最近一个月的Git提交统计"
-- "检测Vue项目中的死代码并生成清理报告" 
+- "检测Vue项目中的死代码并生成清理报告"
+
+### API Test MCP Server Usage
+配置和使用API测试MCP服务器的说明：
+
+```bash
+# 1. 首先通过CLI配置测试环境
+ats api-test --wizard
+
+# 2. 启动API测试MCP服务器
+ats api-test --mcp-server
+
+# 3. 添加API测试MCP服务器到Claude Desktop
+claude mcp add api-test -- node /path/to/awesome-tools/mcp-test/server.js
+
+# 4. 验证服务器状态
+claude mcp list
+```
+
+**API测试MCP配置文件示例：**
+```json
+{
+  "mcpServers": {
+    "api-test": {
+      "command": "node",
+      "args": ["/absolute/path/to/awesome-tools/mcp-test/server.js"]
+    }
+  }
+}
+```
+
+**在Claude Desktop中使用API测试：**
+- "设置开发环境为活动环境"
+- "获取用户管理API的Swagger文档"
+- "为UserController生成完整的测试用例"
+- "执行用户注册接口测试，并保存测试结果"
+- "创建数据库快照，然后测试删除用户接口"
+- "生成最近一批测试的详细报告"
+- "对比这次测试结果与上次的差异"
+
+**测试流程示例：**
+1. 调用 `test_env_set_active` 切换到目标环境
+2. 调用 `api_fetch_swagger` 获取API文档
+3. 调用 `auth_login` 获取认证token
+4. Claude分析API结构，生成测试数据
+5. 调用 `test_execute_request` 执行测试
+6. 调用 `test_result_save` 保存结果
+7. Claude生成测试报告 

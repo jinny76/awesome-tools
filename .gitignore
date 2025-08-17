@@ -138,3 +138,7 @@ compressed/
 *.vtt
 *.jpg
 *.png
+/.animation-server-data
+
+# API测试MCP数据目录（测试数据不提交）
+/mcp-test/test-data/

@@ -23,21 +23,33 @@ ats --help
 | **Git统计** | `ats gs` | 分析代码提交历史，生成可视化报告 |
 | **死代码清理** | `ats cc -d .` | 智能清理Vue项目未使用代码 |
 | **动画服务器** | `ats as --port 8081` | 翠鸟3D引擎WebSocket服务器，支持场景检查与MCP集成 |
+| **API测试** | `ats at --wizard` | API自动化测试工具，支持Swagger解析和智能测试生成 |
 | **FFmpeg工具** | `ats ff --wizard` | 音视频处理、格式转换、流媒体 |
 | **文件分享** | `ats ss --tunnel` | 一键分享本地文件到公网 |
 | **端口映射** | `ats ss --port-map 3000` | 本地服务映射到公网访问 |
 | **工作屏保** | `ats screen -w` | 专业的工作状态伪装工具 |
 | **消息推送** | `ats n -t "标题"` | Server酱推送通知到微信 |
 | **数据库查询** | `ats db -w` | MySQL/PostgreSQL数据库连接查询 |
-| **MCP集成** | `mcp/` | Claude Desktop/Cursor原生集成 |
+| **MCP集成** | `mcp/` | Claude Desktop原生集成 |
 
 ## 🤖 AI IDE 原生集成
 
-Awesome Tools 提供标准 MCP (Model Context Protocol) 服务器，可直接集成到 Claude Desktop 和 Cursor 中：
+Awesome Tools 提供两个专门的 MCP (Model Context Protocol) 服务器，可直接集成到 Claude Desktop 和 Cursor 中：
+
+### 1. 通用工具MCP (`mcp/server.js`)
+提供Git、Vue死代码清理、数据库、翠鸟3D场景等工具集成：
 
 ```bash
-# 一键添加MCP服务器
+# 一键添加通用工具MCP服务器
 claude mcp add awesome-tools -- node path/to/awesome-tools/mcp/server.js
+```
+
+### 2. API测试MCP (`mcp-test/server.js`) 
+专门用于API自动化测试，与Claude协作进行智能测试：
+
+```bash
+# 一键添加API测试MCP服务器  
+claude mcp add api-test -- node path/to/awesome-tools/mcp-test/server.js
 ```
 
 **手动配置 Claude Desktop：**
@@ -45,9 +57,32 @@ claude mcp add awesome-tools -- node path/to/awesome-tools/mcp/server.js
 {
   "mcpServers": {
     "awesome-tools": {
-      "command": "node",
+      "command": "node", 
       "args": ["path/to/awesome-tools/mcp/server.js"],
       "env": {"NODE_ENV": "production"}
+    },
+    "api-test": {
+      "command": "node",
+      "args": ["path/to/awesome-tools/mcp-test/server.js"]
+    }
+  }
+}
+```
+
+**配置 Cursor：**
+在 Cursor 设置中添加 MCP 服务器：
+```json
+{
+  "mcp": {
+    "servers": {
+      "awesome-tools": {
+        "command": "node",
+        "args": ["path/to/awesome-tools/mcp/server.js"]
+      },
+      "api-test": {
+        "command": "node", 
+        "args": ["path/to/awesome-tools/mcp-test/server.js"]
+      }
     }
   }
 }
@@ -63,6 +98,8 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 ```
 
 **在 Claude Desktop 中使用：**
+
+**通用工具MCP：**
 - 💬 "发送一条部署完成通知到微信"
 - 📊 "分析当前项目最近一个月的Git提交统计" 
 - 🧹 "检测Vue项目中的死代码并生成清理报告"
@@ -71,7 +108,15 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 - 🔧 "隐藏场景中的贴片机设备"
 - ⚡ "对场景执行性能优化策略"
 
-**支持的MCP工具：**
+**API测试MCP：**
+- 🔍 "获取http://localhost:8080的Swagger文档摘要"
+- 🛠️ "为用户管理API生成完整的测试用例"
+- ⚙️ "创建测试环境配置，URL是http://localhost:8080"
+- 🧪 "执行用户注册接口测试并保存结果"
+- 📋 "生成最近一批API测试的详细报告"
+- 🔄 "对比这次测试结果与上次的差异"
+
+**通用工具MCP支持的工具：**
 - `serverchan_send` - Server酱推送通知
 - `git_stats_analyze` - Git统计分析  
 - `clean_code_analyze` - Vue死代码清理
@@ -82,6 +127,20 @@ echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":
 - `query_atomic_capabilities` - 查询场景检查器原子操作能力
 - `intelligent_task_decomposition` - 智能任务分解与执行
 - `atomic_operation_history` - 原子操作历史管理与回滚
+
+**API测试MCP支持的工具：**
+- `test_env_*` - 测试环境管理（创建、列出、切换、删除）
+- `api_fetch_swagger` - 智能分块获取Swagger文档
+- `api_get_swagger_summary` - 获取API文档摘要统计
+- `api_get_service_apis` - 获取服务的完整接口和参数说明
+- `api_parse_controllers` - 解析Controller列表
+- `auth_*` - 认证管理（登录、验证、获取token）
+- `test_execute_request` - 执行HTTP请求测试
+- `test_batch_execute` - 批量执行测试
+- `test_context_*` - 测试上下文管理（存储动态数据）
+- `test_suite_*` - 测试套件管理（保存、加载、删除）
+- `test_result_*` - 测试结果管理（保存、查询、汇总）
+- `db_snapshot_*` - 数据库快照管理（创建、恢复、列出）
 
 **MCP服务器特点：**
 - 🔧 **标准协议** - 使用官方MCP SDK，完全兼容Claude Desktop

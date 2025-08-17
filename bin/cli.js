@@ -303,6 +303,31 @@ program
     }
   }));
 
+// === API Test 命令 ===
+program
+  .command('api-test')
+  .alias('at')
+  .description('API自动化测试工具：配置测试环境、管理测试套件、与MCP协作进行智能测试')
+  .option('-w, --wizard', '启动配置向导')
+  .option('--env <name>', '切换到指定环境')
+  .option('--list-env', '列出所有测试环境')
+  .option('--list-suites', '列出所有测试套件')
+  .option('--create-env <name>', '创建新测试环境')
+  .option('--delete-env <name>', '删除测试环境')
+  .option('--mcp-server', '启动测试MCP服务器')
+  .action(wrapAction('api-test', async (options) => {
+    try {
+      const { startApiTest } = require('../lib/commands/api-test');
+      await startApiTest(options);
+    } catch (error) {
+      console.error('❌ 错误:', error.message);
+      if (error.stack && options.debug) {
+        console.error(error.stack);
+      }
+      process.exit(1);
+    }
+  }));
+
 // 将驼峰命名转换为连字符命名
 function convertToKebabCase(str) {
   return str.replace(/([A-Z])/g, '-$1').toLowerCase();
