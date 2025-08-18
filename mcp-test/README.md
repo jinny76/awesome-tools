@@ -16,6 +16,29 @@
 - Claude负责智能决策：测试策略、数据生成、结果分析
 - MCP负责执行操作：HTTP请求、数据存储、环境管理
 
+## 数据存储位置
+
+测试数据默认存储在**被测试项目**的 `.api-test` 目录下，而不是工具目录中：
+
+```
+被测试项目/
+├── src/
+├── package.json
+└── .api-test/              # 测试数据存储在这里
+    ├── environments.json   # 环境配置
+    ├── suites/            # 测试套件
+    ├── results/           # 测试结果
+    └── snapshots/         # 数据库快照
+```
+
+**自定义存储路径**：
+```bash
+# 通过环境变量指定自定义路径
+export API_TEST_DATA_DIR=/custom/path/.api-test
+```
+
+**注意**：请将 `.api-test/` 添加到项目的 `.gitignore` 文件中，避免提交敏感信息。
+
 ## 安装配置
 
 ### 1. 安装依赖
@@ -27,14 +50,18 @@ npm install
 
 ### 2. 配置Claude Desktop
 
-在Claude Desktop的配置文件中添加：
+在Claude Desktop的配置文件中添加（**重要：必须传入项目目录参数**）：
 
 ```json
 {
   "mcpServers": {
     "api-test": {
       "command": "node",
-      "args": ["/absolute/path/to/mcp-test/server.js"]
+      "args": [
+        "/absolute/path/to/mcp-test/server.js",
+        "--project-dir",
+        "/path/to/your/project"
+      ]
     }
   }
 }
@@ -43,7 +70,14 @@ npm install
 或使用命令行：
 
 ```bash
-claude mcp add api-test -- node /absolute/path/to/mcp-test/server.js
+claude mcp add api-test -- node /absolute/path/to/mcp-test/server.js --project-dir /path/to/your/project
+```
+
+**最简单的方法：在项目目录下运行**
+```bash
+cd /path/to/your/project
+ats api-test --mcp-server
+# 这会自动生成正确的MCP配置命令
 ```
 
 ### 3. 创建测试环境
@@ -93,9 +127,19 @@ ats api-test --wizard
 
 | 工具名称 | 功能描述 |
 |---------|---------|
-| `test_context_set` | 设置测试上下文数据 |
+| `test_context_set` | 设置测试上下文数据（自动更新当前日期） |
 | `test_context_get` | 获取测试上下文数据 |
+| `test_context_keys` | 获取测试上下文所有键名（分类显示） |
 | `test_context_clear` | 清空测试上下文 |
+
+**增强功能**：
+- ✅ **自动日期更新**：每次调用 `test_context_set` 时自动更新日期相关键值
+- ✅ **多种日期格式**：
+  - `current_date`: 2025-01-15 (YYYY-MM-DD)
+  - `current_datetime`: 2025-01-15T10:30:45.123Z (ISO格式)
+  - `current_timestamp`: 1705316245123 (Unix时间戳)
+  - `current_date_cn`: 2025/1/15 (中文格式)
+- ✅ **键值分类显示**：`test_context_keys` 按自动日期键和用户自定义键分类显示
 
 ### 测试套件管理
 
@@ -114,14 +158,21 @@ ats api-test --wizard
 | `test_result_query` | 查询测试结果 |
 | `test_result_summary` | 获取测试结果汇总 |
 
-### 数据库操作
+### 数据库操作（基于连接库实现）
 
 | 工具名称 | 功能描述 |
 |---------|---------|
-| `db_snapshot_create` | 创建数据库快照 |
+| `db_snapshot_create` | 创建数据库快照（表结构+数据，JSON格式） |
 | `db_snapshot_list` | 列出所有数据库快照 |
-| `db_snapshot_restore` | 恢复数据库快照 |
-| `db_execute_query` | 执行数据库查询 |
+| `db_snapshot_restore` | 恢复数据库快照（支持完整恢复或仅数据恢复） |
+| `db_execute_query` | 执行数据库查询（格式化表格输出） |
+
+**新特性**：
+- ✅ 使用 `mysql2` 和 `pg` 连接库，无需外部命令行工具
+- ✅ JSON格式备份，包含表结构和数据
+- ✅ 支持参数化查询，防止SQL注入
+- ✅ 友好的表格格式查询结果
+- ✅ 完整的错误处理和连接管理
 
 ### 工具函数
 

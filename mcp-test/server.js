@@ -17,14 +17,24 @@ import fs from 'fs/promises';
 import axios from 'axios';
 import yaml from 'yaml';
 import { v4 as uuidv4 } from 'uuid';
-import { execSync } from 'child_process';
+import mysql from 'mysql2/promise';
+import pg from 'pg';
 
 // 获取当前文件的目录路径
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// 数据存储路径
-const DATA_DIR = join(__dirname, 'test-data');
+// 数据存储路径 - 使用被测试项目的目录而不是工具目录
+// 优先级：启动参数 > 环境变量 > 当前工作目录
+let projectDir = process.cwd();
+const projectDirArg = process.argv.find(arg => arg.startsWith('--project-dir='));
+if (projectDirArg) {
+  projectDir = projectDirArg.split('=')[1];
+} else if (process.argv.includes('--project-dir') && process.argv[process.argv.indexOf('--project-dir') + 1]) {
+  projectDir = process.argv[process.argv.indexOf('--project-dir') + 1];
+}
+
+const DATA_DIR = process.env.API_TEST_DATA_DIR || join(projectDir, '.api-test');
 const ENVS_FILE = join(DATA_DIR, 'environments.json');
 const SUITES_DIR = join(DATA_DIR, 'suites');
 const RESULTS_DIR = join(DATA_DIR, 'results');
@@ -61,6 +71,10 @@ class ApiTestMCPServer {
    */
   async initializeDataDirectories() {
     try {
+      // 输出数据存储路径信息
+      console.error(`[API Test MCP] Project directory: ${projectDir}`);
+      console.error(`[API Test MCP] Data directory: ${DATA_DIR}`);
+      
       await fs.mkdir(DATA_DIR, { recursive: true });
       await fs.mkdir(SUITES_DIR, { recursive: true });
       await fs.mkdir(RESULTS_DIR, { recursive: true });
@@ -72,6 +86,8 @@ class ApiTestMCPServer {
       } catch {
         await fs.writeFile(ENVS_FILE, JSON.stringify({ environments: [], active: null }, null, 2));
       }
+      
+      console.error(`[API Test MCP] Initialized successfully`);
     } catch (error) {
       console.error('Failed to initialize data directories:', error);
     }
@@ -507,6 +523,14 @@ class ApiTestMCPServer {
               properties: {}
             }
           },
+          {
+            name: "test_context_keys",
+            description: "获取测试上下文所有键名",
+            inputSchema: {
+              type: "object",
+              properties: {}
+            }
+          },
           
           // === 测试套件管理 ===
           {
@@ -679,6 +703,11 @@ class ApiTestMCPServer {
                 name: {
                   type: "string",
                   description: "快照名称"
+                },
+                dropExisting: {
+                  type: "boolean",
+                  description: "是否删除现有表后恢复（默认false，只清空数据）",
+                  default: false
                 }
               },
               required: ["name"]
@@ -773,6 +802,8 @@ class ApiTestMCPServer {
             return await this.handleContextGet(args);
           case "test_context_clear":
             return await this.handleContextClear(args);
+          case "test_context_keys":
+            return await this.handleContextKeys(args);
           
           // 测试套件管理
           case "test_suite_save":
@@ -1669,12 +1700,20 @@ class ApiTestMCPServer {
   async handleContextSet(args) {
     const { key, value } = args;
     
+    // 设置用户指定的键值对
     this.testContext.set(key, value);
+    
+    // 自动设置当前日期相关信息
+    const now = new Date();
+    this.testContext.set('current_date', now.toISOString().split('T')[0]); // YYYY-MM-DD
+    this.testContext.set('current_datetime', now.toISOString()); // ISO格式完整时间
+    this.testContext.set('current_timestamp', now.getTime()); // Unix时间戳
+    this.testContext.set('current_date_cn', now.toLocaleDateString('zh-CN')); // 中文日期格式
     
     return {
       content: [{
         type: "text",
-        text: `Context '${key}' set successfully`
+        text: `Context '${key}' set successfully. Auto-updated date context: ${now.toISOString().split('T')[0]}`
       }]
     };
   }
@@ -1704,6 +1743,47 @@ class ApiTestMCPServer {
       content: [{
         type: "text",
         text: `Context cleared (${size} items removed)`
+      }]
+    };
+  }
+
+  async handleContextKeys(args) {
+    const keys = Array.from(this.testContext.keys());
+    
+    // 将键按类型分组
+    const autoKeys = keys.filter(key => key.startsWith('current_'));
+    const userKeys = keys.filter(key => !key.startsWith('current_'));
+    
+    let output = `测试上下文键列表 (共 ${keys.length} 个):\n\n`;
+    
+    if (autoKeys.length > 0) {
+      output += '📅 自动日期键:\n';
+      autoKeys.forEach(key => {
+        const value = this.testContext.get(key);
+        output += `  - ${key}: ${value}\n`;
+      });
+      output += '\n';
+    }
+    
+    if (userKeys.length > 0) {
+      output += '👤 用户自定义键:\n';
+      userKeys.forEach(key => {
+        const value = this.testContext.get(key);
+        const displayValue = typeof value === 'string' && value.length > 50 
+          ? value.substring(0, 50) + '...' 
+          : value;
+        output += `  - ${key}: ${displayValue}\n`;
+      });
+    }
+    
+    if (keys.length === 0) {
+      output = '上下文为空，没有存储任何数据';
+    }
+    
+    return {
+      content: [{
+        type: "text",
+        text: output
       }]
     };
   }
@@ -1893,6 +1973,40 @@ class ApiTestMCPServer {
     };
   }
 
+  // === 数据库连接辅助函数 ===
+  
+  async createDatabaseConnection(dbConfig) {
+    if (dbConfig.type === 'mysql') {
+      return await mysql.createConnection({
+        host: dbConfig.host,
+        port: dbConfig.port,
+        user: dbConfig.user,
+        password: dbConfig.password,
+        database: dbConfig.database
+      });
+    } else if (dbConfig.type === 'postgres') {
+      const client = new pg.Client({
+        host: dbConfig.host,
+        port: dbConfig.port,
+        user: dbConfig.user,
+        password: dbConfig.password,
+        database: dbConfig.database
+      });
+      await client.connect();
+      return client;
+    } else {
+      throw new Error(`Unsupported database type: ${dbConfig.type}`);
+    }
+  }
+
+  async closeDatabaseConnection(connection, dbType) {
+    if (dbType === 'mysql') {
+      await connection.end();
+    } else if (dbType === 'postgres') {
+      await connection.end();
+    }
+  }
+
   // === 数据库操作实现 ===
   
   async handleSnapshotCreate(args) {
@@ -1904,47 +2018,99 @@ class ApiTestMCPServer {
     
     const db = this.activeEnvironment.database;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const snapshotFile = join(SNAPSHOTS_DIR, `${name}_${timestamp}.sql`);
+    const snapshotFile = join(SNAPSHOTS_DIR, `${name}_${timestamp}.json`);
     
-    // 构建mysqldump或pg_dump命令
-    let dumpCmd;
-    if (db.type === 'mysql') {
-      dumpCmd = `mysqldump -h ${db.host} -P ${db.port} -u ${db.user} -p${db.password} ${db.database}`;
-      if (tables.length > 0) {
-        dumpCmd += ` ${tables.join(' ')}`;
-      }
-    } else if (db.type === 'postgres') {
-      dumpCmd = `PGPASSWORD=${db.password} pg_dump -h ${db.host} -p ${db.port} -U ${db.user} ${db.database}`;
-      if (tables.length > 0) {
-        dumpCmd += tables.map(t => ` -t ${t}`).join('');
-      }
-    } else {
-      throw new Error(`Unsupported database type: ${db.type}`);
-    }
-    
+    let connection;
     try {
-      const dump = execSync(dumpCmd, { encoding: 'utf8', maxBuffer: 1024 * 1024 * 100 });
-      await fs.writeFile(snapshotFile, dump);
+      connection = await this.createDatabaseConnection(db);
+      
+      // 获取要备份的表列表
+      let targetTables = tables;
+      if (targetTables.length === 0) {
+        // 如果没有指定表，获取所有表
+        if (db.type === 'mysql') {
+          const [rows] = await connection.execute('SHOW TABLES');
+          targetTables = rows.map(row => Object.values(row)[0]);
+        } else if (db.type === 'postgres') {
+          const result = await connection.query("SELECT tablename FROM pg_tables WHERE schemaname = 'public'");
+          targetTables = result.rows.map(row => row.tablename);
+        }
+      }
+      
+      // 备份数据
+      const backupData = {
+        metadata: {
+          name,
+          timestamp,
+          database: db.database,
+          tables: targetTables,
+          environment: this.activeEnvironment.name,
+          dbType: db.type
+        },
+        tables: {}
+      };
+      
+      for (const tableName of targetTables) {
+        console.error(`[DB Backup] Backing up table: ${tableName}`);
+        
+        // 获取表结构
+        let createTableSQL = '';
+        if (db.type === 'mysql') {
+          const [rows] = await connection.execute(`SHOW CREATE TABLE \`${tableName}\``);
+          createTableSQL = rows[0]['Create Table'];
+        } else if (db.type === 'postgres') {
+          // PostgreSQL 表结构获取比较复杂，这里简化处理
+          const result = await connection.query(`
+            SELECT column_name, data_type, is_nullable, column_default
+            FROM information_schema.columns 
+            WHERE table_name = $1 AND table_schema = 'public'
+            ORDER BY ordinal_position
+          `, [tableName]);
+          
+          const columns = result.rows.map(col => 
+            `${col.column_name} ${col.data_type}${col.is_nullable === 'NO' ? ' NOT NULL' : ''}${col.column_default ? ` DEFAULT ${col.column_default}` : ''}`
+          ).join(', ');
+          createTableSQL = `CREATE TABLE ${tableName} (${columns})`;
+        }
+        
+        // 获取表数据
+        let tableData = [];
+        if (db.type === 'mysql') {
+          const [rows] = await connection.execute(`SELECT * FROM \`${tableName}\``);
+          tableData = rows;
+        } else if (db.type === 'postgres') {
+          const result = await connection.query(`SELECT * FROM "${tableName}"`);
+          tableData = result.rows;
+        }
+        
+        backupData.tables[tableName] = {
+          structure: createTableSQL,
+          data: tableData,
+          rowCount: tableData.length
+        };
+      }
+      
+      // 保存备份文件
+      await fs.writeFile(snapshotFile, JSON.stringify(backupData, null, 2));
       
       // 保存快照元数据
       const metaFile = join(SNAPSHOTS_DIR, `${name}_${timestamp}.meta.json`);
-      await fs.writeFile(metaFile, JSON.stringify({
-        name,
-        timestamp,
-        database: db.database,
-        tables,
-        size: dump.length,
-        environment: this.activeEnvironment.name
-      }, null, 2));
+      await fs.writeFile(metaFile, JSON.stringify(backupData.metadata, null, 2));
+      
+      const totalRows = Object.values(backupData.tables).reduce((sum, table) => sum + table.rowCount, 0);
       
       return {
         content: [{
           type: "text",
-          text: `Database snapshot '${name}' created successfully`
+          text: `Database snapshot '${name}' created successfully\nTables: ${targetTables.length}\nTotal rows: ${totalRows}\nFile: ${snapshotFile}`
         }]
       };
     } catch (error) {
       throw new Error(`Failed to create snapshot: ${error.message}`);
+    } finally {
+      if (connection) {
+        await this.closeDatabaseConnection(connection, db.type);
+      }
     }
   }
 
@@ -1968,7 +2134,7 @@ class ApiTestMCPServer {
   }
 
   async handleSnapshotRestore(args) {
-    const { name } = args;
+    const { name, dropExisting = false } = args;
     
     if (!this.activeEnvironment?.database) {
       throw new Error('No database configuration in active environment');
@@ -1978,7 +2144,7 @@ class ApiTestMCPServer {
     
     // 查找快照文件
     const files = await fs.readdir(SNAPSHOTS_DIR);
-    const snapshotFile = files.find(f => f.startsWith(`${name}_`) && f.endsWith('.sql'));
+    const snapshotFile = files.find(f => f.startsWith(`${name}_`) && f.endsWith('.json'));
     
     if (!snapshotFile) {
       throw new Error(`Snapshot '${name}' not found`);
@@ -1986,27 +2152,101 @@ class ApiTestMCPServer {
     
     const snapshotPath = join(SNAPSHOTS_DIR, snapshotFile);
     
-    // 构建恢复命令
-    let restoreCmd;
-    if (db.type === 'mysql') {
-      restoreCmd = `mysql -h ${db.host} -P ${db.port} -u ${db.user} -p${db.password} ${db.database} < ${snapshotPath}`;
-    } else if (db.type === 'postgres') {
-      restoreCmd = `PGPASSWORD=${db.password} psql -h ${db.host} -p ${db.port} -U ${db.user} ${db.database} < ${snapshotPath}`;
-    } else {
-      throw new Error(`Unsupported database type: ${db.type}`);
-    }
-    
+    let connection;
     try {
-      execSync(restoreCmd, { encoding: 'utf8' });
+      // 读取备份数据
+      const backupData = JSON.parse(await fs.readFile(snapshotPath, 'utf8'));
+      
+      if (backupData.metadata.dbType !== db.type) {
+        throw new Error(`Snapshot database type (${backupData.metadata.dbType}) doesn't match current environment (${db.type})`);
+      }
+      
+      connection = await this.createDatabaseConnection(db);
+      
+      let restoredTables = 0;
+      let restoredRows = 0;
+      
+      for (const [tableName, tableData] of Object.entries(backupData.tables)) {
+        console.error(`[DB Restore] Restoring table: ${tableName}`);
+        
+        if (dropExisting) {
+          // 删除现有表
+          try {
+            if (db.type === 'mysql') {
+              await connection.execute(`DROP TABLE IF EXISTS \`${tableName}\``);
+            } else if (db.type === 'postgres') {
+              await connection.query(`DROP TABLE IF EXISTS "${tableName}" CASCADE`);
+            }
+          } catch (error) {
+            console.error(`[DB Restore] Warning: Failed to drop table ${tableName}: ${error.message}`);
+          }
+        }
+        
+        // 清空表数据（如果表存在）
+        try {
+          if (db.type === 'mysql') {
+            await connection.execute(`TRUNCATE TABLE \`${tableName}\``);
+          } else if (db.type === 'postgres') {
+            await connection.query(`TRUNCATE TABLE "${tableName}" RESTART IDENTITY CASCADE`);
+          }
+        } catch (error) {
+          // 表可能不存在，尝试创建
+          if (dropExisting) {
+            try {
+              if (db.type === 'mysql') {
+                await connection.execute(tableData.structure);
+              } else if (db.type === 'postgres') {
+                await connection.query(tableData.structure);
+              }
+            } catch (createError) {
+              console.error(`[DB Restore] Warning: Failed to create table ${tableName}: ${createError.message}`);
+            }
+          }
+        }
+        
+        // 恢复数据
+        if (tableData.data && tableData.data.length > 0) {
+          // 获取列名
+          const columns = Object.keys(tableData.data[0]);
+          
+          if (db.type === 'mysql') {
+            const placeholders = columns.map(() => '?').join(', ');
+            const columnList = columns.map(col => `\`${col}\``).join(', ');
+            const insertSQL = `INSERT INTO \`${tableName}\` (${columnList}) VALUES (${placeholders})`;
+            
+            for (const row of tableData.data) {
+              const values = columns.map(col => row[col]);
+              await connection.execute(insertSQL, values);
+            }
+          } else if (db.type === 'postgres') {
+            const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
+            const columnList = columns.map(col => `"${col}"`).join(', ');
+            const insertSQL = `INSERT INTO "${tableName}" (${columnList}) VALUES (${placeholders})`;
+            
+            for (const row of tableData.data) {
+              const values = columns.map(col => row[col]);
+              await connection.query(insertSQL, values);
+            }
+          }
+          
+          restoredRows += tableData.data.length;
+        }
+        
+        restoredTables++;
+      }
       
       return {
         content: [{
           type: "text",
-          text: `Database snapshot '${name}' restored successfully`
+          text: `Database snapshot '${name}' restored successfully\nTables restored: ${restoredTables}\nRows restored: ${restoredRows}`
         }]
       };
     } catch (error) {
       throw new Error(`Failed to restore snapshot: ${error.message}`);
+    } finally {
+      if (connection) {
+        await this.closeDatabaseConnection(connection, db.type);
+      }
     }
   }
 
@@ -2019,27 +2259,109 @@ class ApiTestMCPServer {
     
     const db = this.activeEnvironment.database;
     
-    // 构建查询命令
-    let queryCmd;
-    if (db.type === 'mysql') {
-      queryCmd = `mysql -h ${db.host} -P ${db.port} -u ${db.user} -p${db.password} ${db.database} -e "${query}"`;
-    } else if (db.type === 'postgres') {
-      queryCmd = `PGPASSWORD=${db.password} psql -h ${db.host} -p ${db.port} -U ${db.user} ${db.database} -c "${query}"`;
-    } else {
-      throw new Error(`Unsupported database type: ${db.type}`);
-    }
-    
+    let connection;
     try {
-      const result = execSync(queryCmd, { encoding: 'utf8' });
+      connection = await this.createDatabaseConnection(db);
+      
+      let result;
+      let affectedRows = 0;
+      
+      if (db.type === 'mysql') {
+        const [rows, fields] = await connection.execute(query, params);
+        
+        // 检查是否是SELECT查询
+        if (Array.isArray(rows)) {
+          result = {
+            rows: rows,
+            fields: fields ? fields.map(f => ({
+              name: f.name,
+              type: f.type,
+              length: f.length
+            })) : [],
+            rowCount: rows.length
+          };
+        } else {
+          // INSERT, UPDATE, DELETE 等操作
+          affectedRows = rows.affectedRows || 0;
+          result = {
+            affectedRows,
+            insertId: rows.insertId || null,
+            message: `Query executed successfully. ${affectedRows} row(s) affected.`
+          };
+        }
+      } else if (db.type === 'postgres') {
+        const queryResult = await connection.query(query, params);
+        
+        if (queryResult.rows) {
+          result = {
+            rows: queryResult.rows,
+            fields: queryResult.fields ? queryResult.fields.map(f => ({
+              name: f.name,
+              type: f.dataTypeID,
+              length: f.dataTypeSize
+            })) : [],
+            rowCount: queryResult.rows.length
+          };
+        } else {
+          affectedRows = queryResult.rowCount || 0;
+          result = {
+            affectedRows,
+            message: `Query executed successfully. ${affectedRows} row(s) affected.`
+          };
+        }
+      }
+      
+      // 格式化输出
+      let output = '';
+      if (result.rows) {
+        // SELECT 查询结果
+        if (result.rows.length === 0) {
+          output = 'No rows returned.';
+        } else {
+          // 创建表格输出
+          const headers = Object.keys(result.rows[0]);
+          const maxWidths = headers.map(header => 
+            Math.max(header.length, ...result.rows.map(row => 
+              String(row[header] || '').length
+            ))
+          );
+          
+          // 表头
+          output += '|' + headers.map((header, i) => 
+            ` ${header.padEnd(maxWidths[i])} `
+          ).join('|') + '|\n';
+          
+          // 分隔线
+          output += '|' + maxWidths.map(width => 
+            '-'.repeat(width + 2)
+          ).join('|') + '|\n';
+          
+          // 数据行
+          result.rows.forEach(row => {
+            output += '|' + headers.map((header, i) => 
+              ` ${String(row[header] || '').padEnd(maxWidths[i])} `
+            ).join('|') + '|\n';
+          });
+          
+          output += `\n${result.rowCount} row(s) returned.`;
+        }
+      } else {
+        // INSERT/UPDATE/DELETE 结果
+        output = result.message;
+      }
       
       return {
         content: [{
           type: "text",
-          text: result
+          text: output
         }]
       };
     } catch (error) {
       throw new Error(`Query execution failed: ${error.message}`);
+    } finally {
+      if (connection) {
+        await this.closeDatabaseConnection(connection, db.type);
+      }
     }
   }
 

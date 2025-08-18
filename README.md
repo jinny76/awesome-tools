@@ -48,8 +48,12 @@ claude mcp add awesome-tools -- node path/to/awesome-tools/mcp/server.js
 专门用于API自动化测试，与Claude协作进行智能测试：
 
 ```bash
-# 一键添加API测试MCP服务器  
-claude mcp add api-test -- node path/to/awesome-tools/mcp-test/server.js
+# 在项目根目录下运行（重要：确保数据存储在正确位置）
+cd /path/to/your/project
+ats api-test --mcp-server
+
+# 或手动添加（需指定项目目录）
+claude mcp add api-test -- node path/to/awesome-tools/mcp-test/server.js --project-dir /path/to/your/project
 ```
 
 **手动配置 Claude Desktop：**
@@ -63,7 +67,7 @@ claude mcp add api-test -- node path/to/awesome-tools/mcp-test/server.js
     },
     "api-test": {
       "command": "node",
-      "args": ["path/to/awesome-tools/mcp-test/server.js"]
+      "args": ["path/to/awesome-tools/mcp-test/server.js", "--project-dir", "/path/to/your/project"]
     }
   }
 }
@@ -81,7 +85,7 @@ claude mcp add api-test -- node path/to/awesome-tools/mcp-test/server.js
       },
       "api-test": {
         "command": "node", 
-        "args": ["path/to/awesome-tools/mcp-test/server.js"]
+        "args": ["path/to/awesome-tools/mcp-test/server.js", "--project-dir", "/path/to/your/project"]
       }
     }
   }
