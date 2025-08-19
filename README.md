@@ -82,7 +82,7 @@ ats api-test --mcp-server
 
 ```bash
 # 克隆仓库
-git clone https://github.com/kingfishers/awesome_tools.git
+git clone https://github.com/jinny76/awesome_tools.git
 cd awesome_tools
 
 # 安装依赖
