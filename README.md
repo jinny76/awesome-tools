@@ -15,6 +15,11 @@ npm install -g @kingfishers/awesome_tools
 # 查看帮助
 ats --help
 awesome-tools --help
+
+# 🔥 热门功能快速体验
+ats bt --wizard      # 浏览器工具一键安装
+ats gs --since "1 month ago"  # Git统计分析
+ats cc -d ./vue-project --dry-run  # Vue死代码检测
 ```
 
 ## 🎯 核心功能
@@ -32,6 +37,7 @@ awesome-tools --help
 ### 测试工具
 - **[API自动化测试](docs/commands/api-test.md)** - 智能API测试工具，支持Swagger和MCP集成
 - **[数据库查询](docs/commands/database.md)** - MySQL/PostgreSQL快速连接查询工具
+- **[浏览器工具MCP](docs/commands/browser-tools.md)** - 浏览器自动化监控，支持Chrome扩展和AI集成
 
 ### 实用工具
 - **[工作屏保](docs/commands/screensaver.md)** - 专业的工作状态伪装工具
@@ -51,6 +57,7 @@ awesome-tools --help
 | `screensaver` | `screen` | 工作屏保 |
 | `animation-server` | `as` | 动画WebSocket服务器 |
 | `api-test` | `at` | API自动化测试 |
+| `browser-tools` | `bt` | 浏览器工具MCP |
 
 ## 🤖 AI IDE 集成
 
@@ -69,6 +76,15 @@ claude mcp add awesome-tools -- node $(npm root -g)/@kingfishers/awesome_tools/m
 # 在项目根目录运行
 cd /your/project
 ats api-test --mcp-server
+```
+
+#### 3. 浏览器工具MCP
+```bash
+# 安装和配置浏览器工具
+ats bt --wizard
+
+# 自动下载Chrome扩展
+ats bt --extension
 ```
 
 详细配置请参考 [MCP集成文档](docs/mcp-integration.md)
