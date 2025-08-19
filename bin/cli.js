@@ -10,6 +10,7 @@ const { startScreensaver } = require('../lib/commands/screensaver');
 const { startNotify } = require('../lib/commands/server-chan');
 const { startDatabase } = require('../lib/commands/database');
 const { startAnimationServer } = require('../lib/commands/animation-server');
+const browserToolsCommand = require('../lib/commands/browser-tools');
 const CommandHistory = require('../lib/utils/command-history');
 
 const program = new Command();
@@ -328,6 +329,30 @@ program
     }
   }));
 
+// === Browser Tools 命令 ===
+program
+  .command('browser-tools')
+  .alias('bt')
+  .description('浏览器工具MCP：自动安装、配置和管理browser-tools-mcp，支持Chrome扩展和AI集成')
+  .option('-w, --wizard', '启动安装向导')
+  .option('--start', '启动服务器')
+  .option('--stop', '停止服务器')
+  .option('--status', '查看服务器状态')
+  .option('--config [type]', '显示配置范例 (claude/cursor/all)', 'all')
+  .option('--extension', '下载和安装Chrome扩展指南')
+  .option('-p, --port <port>', '服务器端口', '3025')
+  .action(wrapAction('browser-tools', async (options) => {
+    try {
+      await browserToolsCommand(options);
+    } catch (error) {
+      console.error('❌ 错误:', error.message);
+      if (error.stack && options.debug) {
+        console.error(error.stack);
+      }
+      process.exit(1);
+    }
+  }));
+
 // 将驼峰命名转换为连字符命名
 function convertToKebabCase(str) {
   return str.replace(/([A-Z])/g, '-$1').toLowerCase();
@@ -345,7 +370,8 @@ function getCommandAlias() {
     'screen': 'screensaver',
     'n': 'notify',
     'db': 'database',
-    'as': 'animation-server'
+    'as': 'animation-server',
+    'bt': 'browser-tools'
   };
 }
 
@@ -357,7 +383,7 @@ function getFullCommandName(commandName) {
 
 // 获取所有有效命令（包括别名）
 function getAllValidCommands() {
-  const fullCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server', 'remote-server', 'screensaver', 'notify', 'database', 'animation-server'];
+  const fullCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server', 'remote-server', 'screensaver', 'notify', 'database', 'animation-server', 'browser-tools'];
   const aliases = Object.keys(getCommandAlias());
   return [...fullCommands, ...aliases];
 }
