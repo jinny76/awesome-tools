@@ -465,6 +465,56 @@ class AwesomeToolsMCPServer {
               },
               required: ["action"]
             }
+          },
+          {
+            name: "custom_script_execute",
+            description: "在翠鸟场景检查器中执行自定义JavaScript脚本，用于特定检查或操作",
+            inputSchema: {
+              type: "object",
+              properties: {
+                script: {
+                  type: "string",
+                  description: "要执行的JavaScript脚本代码"
+                },
+                context: {
+                  type: "object",
+                  description: "脚本执行上下文，提供给脚本的额外变量",
+                  properties: {
+                    targetObjects: {
+                      type: "array",
+                      description: "目标对象ID列表",
+                      items: { type: "string" }
+                    },
+                    operationType: {
+                      type: "string",
+                      description: "操作类型标识"
+                    }
+                  }
+                },
+                options: {
+                  type: "object",
+                  description: "执行选项",
+                  properties: {
+                    timeout: {
+                      type: "number",
+                      description: "脚本执行超时时间(毫秒)",
+                      default: 10000
+                    },
+                    returnResult: {
+                      type: "boolean",
+                      description: "是否返回脚本执行结果",
+                      default: true
+                    }
+                  }
+                },
+                serverUrl: {
+                  type: "string",
+                  description: "动画服务器URL",
+                  default: "ws://localhost:8081/animation"
+                }
+              },
+              required: ["script"]
+            }
           }
         ]
       };
@@ -505,6 +555,9 @@ class AwesomeToolsMCPServer {
           
           case "atomic_operation_history":
             return await this.handleAtomicOperationHistory(args);
+          
+          case "custom_script_execute":
+            return await this.handleCustomScriptExecute(args);
           
           default:
             throw new Error(`Unknown tool: ${name}`);
@@ -1764,6 +1817,101 @@ class AwesomeToolsMCPServer {
           type: "text",
           text: `❌ 操作历史管理失败：${error.message}\n\n**可能的原因：**\n1. 动画服务器未运行\n2. 操作ID不存在\n3. 网络连接问题`
         }],
+        isError: true
+      };
+    }
+  }
+
+  /**
+   * 处理自定义脚本执行
+   */
+  async handleCustomScriptExecute(args) {
+    const {
+      script,
+      context = {},
+      options = {},
+      serverUrl = 'ws://localhost:8081/animation'
+    } = args;
+
+    try {
+      const serverPort = serverUrl.includes(':8081') ? '8081' : '8080';
+      const apiUrl = `http://localhost:${serverPort}/api/script/execute`;
+      
+      // 构建请求体
+      const requestBody = {
+        script: script,
+        context: context,
+        options: {
+          timeout: options.timeout || 10000,
+          returnResult: options.returnResult !== false,
+          ...options
+        }
+      };
+
+      // 发送HTTP请求到动画服务器
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      let text = `🎭 自定义脚本执行结果\n\n`;
+      text += `**执行状态:** ${result.success ? '✅ 成功' : '❌ 失败'}\n`;
+      text += `**服务器响应:** ${result.message}\n`;
+      
+      if (result.data) {
+        text += `**执行时间:** ${result.data.executionTime}ms\n`;
+        
+        if (result.data.result !== undefined) {
+          text += `**返回结果:**\n\`\`\`json\n${JSON.stringify(result.data.result, null, 2)}\n\`\`\`\n`;
+        }
+        
+        if (result.clients) {
+          text += `**影响客户端:** ${result.clients} 个\n`;
+        }
+      }
+
+      text += `\n💡 **说明:** 脚本已在翠鸟场景检查器的安全沙盒环境中执行。\n\n`;
+      
+      text += `**可用API:**\n`;
+      text += `- \`context.inspector\` - 场景检查器API\n`;
+      text += `- \`context.kingfisher\` - 翠鸟引擎API\n`;
+      text += `- \`context.console\` - 安全的日志输出\n`;
+      text += `- \`scene\` - 翠鸟场景对象\n`;
+      text += `- \`inspector\` - 检查器实例\n\n`;
+      
+      text += `**脚本示例:**\n`;
+      text += `\`\`\`javascript\n`;
+      text += `// 获取场景中所有可见网格的数量\n`;
+      text += `const nodes = context.inspector.getAllNodes();\n`;
+      text += `const visibleCount = nodes.filter(n => n.isVisible !== false).length;\n`;
+      text += `return { totalNodes: nodes.length, visibleNodes: visibleCount };\n`;
+      text += `\`\`\``;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: text
+          }
+        ]
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `❌ 自定义脚本执行失败：${error.message}\n\n**可能的原因：**\n1. 动画服务器未运行 (确保运行: ats as --port 8081)\n2. 翠鸟场景检查器未连接\n3. 脚本语法错误或包含不安全代码\n4. 脚本执行超时\n\n**调试建议：**\n- 检查服务器状态: http://localhost:8081/status\n- 查看浏览器控制台的错误信息\n- 确认脚本不包含危险的API调用\n- 使用 scene_inspect 工具确认场景状态`
+          }
+        ],
         isError: true
       };
     }
