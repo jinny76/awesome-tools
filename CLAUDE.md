@@ -163,6 +163,21 @@ const inspector = new KingfisherSceneInspector();
 - 节点查询: `inspector.query({ nodes: { type: 'TransformNode' } })`
 - 机位切换: `inspector.optimize('focus_camera', { target: 'building1' })`
 - 对象隐藏: `inspector.optimize('hide_objects', { objects: ['obj1', 'obj2'] })`
+- 自定义脚本: `inspector.executeScript('return scene.meshes.length')`
+
+**自定义脚本执行 (v2.1.0+):**
+- **安全沙盒**: 脚本在受控环境中执行，支持场景分析和数据处理
+- **丰富API**: 提供`context.inspector`、`context.kingfisher`、`scene`等API访问
+- **实时调试**: 支持`context.console`安全日志输出
+- **MCP集成**: 通过MCP服务器的`custom_script_execute`工具调用
+- **HTTP接口**: 直接调用`/api/script/execute`端点
+- **示例脚本**: 
+  ```javascript
+  // 统计可见设备数量
+  const nodes = context.inspector.getAllNodes();
+  const visible = nodes.filter(n => n.isVisible !== false).length;
+  return { total: nodes.length, visible: visible };
+  ```
 
 ## Key Features
 
@@ -171,6 +186,7 @@ const inspector = new KingfisherSceneInspector();
 - **Server酱推送** (`serverchan_send`) - 发送通知到微信等平台
 - **Git统计分析** (`git_stats_analyze`) - 深度分析Git提交历史
 - **Vue死代码清理** (`clean_code_analyze`) - 智能检测Vue项目死代码
+- **自定义脚本执行** (`custom_script_execute`) - 在翠鸟场景检查器中执行自定义JavaScript脚本
 - **Stdio通信** - 通过stdin/stdout进行JSON-RPC通信
 - **CLI集成** - 调用现有CLI命令保持功能一致性
 - **易于调试** - 支持手动测试和验证
@@ -430,4 +446,46 @@ claude mcp list
 4. Claude分析API结构，生成测试数据
 5. 调用 `test_execute_request` 执行测试
 6. 调用 `test_result_save` 保存结果
-7. Claude生成测试报告 
+7. Claude生成测试报告
+
+### Animation Server (`animation-server`)
+WebSocket服务器，为翠鸟3D引擎提供实时场景分析和优化服务，支持MCP桥接和自定义脚本执行：
+
+**核心功能 (v2.1.0+):**
+- **WebSocket通信**: 实时双向通信，支持场景数据传输和命令执行
+- **MCP桥接**: 透明代理MCP协议，实现Claude与3D场景的直接交互
+- **场景检查**: 提供`/api/scene/inspect`接口进行实时场景分析
+- **自定义脚本**: 新增`/api/script/execute`接口支持JavaScript脚本执行
+- **原子操作**: 支持复杂的场景操作序列和回滚机制
+- **设备智能分类**: 自动识别和分类3D场景中的设备对象
+
+**自定义脚本执行 (v2.1.0+):**
+```bash
+# HTTP接口调用
+curl -m 30 -X POST "http://localhost:8081/api/script/execute" \
+  -H "Content-Type: application/json" \
+  -d '{"script": "return scene.meshes.length", "options": {"timeout": 15000}}'
+
+# 返回结果
+{"success": true, "message": "脚本执行完成", "data": {"result": 42, "executionTime": 0}}
+```
+
+**安全特性:**
+- **沙盒执行**: 脚本在受控环境中运行，限制危险API调用
+- **超时保护**: 可配置执行超时时间防止死循环
+- **API限制**: 黑名单过滤eval、XMLHttpRequest等危险函数
+- **结果序列化**: 安全处理和传输复杂对象结构
+
+**WebSocket重连优化 (v2.1.0+):**
+- **智能重连**: 最大重连次数限制为2次，避免无限重连
+- **连接状态监控**: 实时监控WebSocket连接健康状态
+- **优雅降级**: 连接失败时提供友好的错误提示和状态信息
+
+**启动方式:**
+```bash
+# 启动动画服务器（默认端口8080）
+ats animation-server --port 8081 --verbose
+
+# 后台运行
+ats animation-server --background --port 8081
+``` 
