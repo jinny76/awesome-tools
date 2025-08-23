@@ -19,6 +19,11 @@
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            /* 移动端优化 */
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
         }
 
         /* 顶部工具栏 */
@@ -115,6 +120,45 @@
             cursor: not-allowed;
         }
 
+        /* 左侧模式按钮 */
+        .mode-buttons {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .mode-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #fff;
+            padding: 6px 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 36px;
+            min-height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mode-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .mode-btn.active {
+            background: #007acc;
+            border-color: #007acc;
+        }
+
+        .mode-btn:disabled {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
+            color: #666;
+            cursor: not-allowed;
+        }
+
         /* 截屏显示区域 */
         .screenshot-container {
             flex: 1;
@@ -158,15 +202,675 @@
         .status-indicator.disconnected {
             background: #f44336;
         }
+
+        /* 文件管理界面样式 - 移动端优化 */
+        .file-manager {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            margin-top: 48px;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        .file-manager.active {
+            display: flex;
+        }
+
+        .file-breadcrumb {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #ccc;
+            word-break: break-all;
+        }
+
+        .file-list {
+            flex: 1;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 4px;
+            padding: 5px;
+        }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 8px;
+            margin: 2px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            min-height: 44px; /* 移动端友好的点击区域 */
+        }
+
+        .file-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .file-item:active {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .file-icon {
+            margin-right: 10px;
+            font-size: 18px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .file-name {
+            flex: 1;
+            color: #fff;
+            font-size: 14px;
+            word-break: break-all;
+        }
+
+        .file-size {
+            color: #888;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .directory-item .file-name {
+            color: #64b5f6;
+        }
+
+        .text-file-item .file-name {
+            color: #81c784;
+        }
+
+        /* 文件编辑器 */
+        .file-editor {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #000;
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+        }
+
+        .file-editor.active {
+            display: flex;
+        }
+
+        .editor-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .editor-title {
+            color: #fff;
+            font-size: 14px;
+            flex: 1;
+            text-align: center;
+            word-break: break-all;
+        }
+
+        .editor-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #fff;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0 2px;
+        }
+
+        .editor-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .editor-btn.primary {
+            background: #007acc;
+            border-color: #007acc;
+        }
+
+        .editor-btn.primary:hover {
+            background: #005a9e;
+        }
+
+        .editor-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        .editor-textarea {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            padding: 10px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            resize: none;
+            outline: none;
+        }
+
+        .editor-textarea:focus {
+            border-color: #007acc;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* 加载和错误提示 */
+        .loading, .error-message {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .error-message {
+            color: #f44336;
+        }
+
+        /* 移动端响应式优化 */
+        @media (max-width: 768px) {
+            .toolbar {
+                padding: 6px 12px;
+                flex-wrap: wrap;
+            }
+            
+            .input-area {
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            
+            #messageInput {
+                width: 150px;
+                font-size: 16px; /* 防止iOS缩放 */
+            }
+            
+            .shortcut-buttons {
+                flex-wrap: wrap;
+                gap: 2px;
+            }
+            
+            .shortcut-btn {
+                min-width: 28px;
+                padding: 6px 4px;
+                font-size: 11px;
+            }
+            
+            .file-item {
+                padding: 15px 10px;
+                min-height: 48px; /* 更大的触摸区域 */
+            }
+            
+            .file-icon {
+                font-size: 20px;
+                margin-right: 12px;
+            }
+            
+            .file-name {
+                font-size: 15px;
+                line-height: 1.3;
+            }
+            
+            .editor-toolbar {
+                padding: 12px;
+            }
+            
+            .editor-btn {
+                padding: 8px 12px;
+                min-height: 44px; /* 移动端推荐最小触摸尺寸 */
+                font-size: 15px;
+            }
+            
+            .editor-textarea {
+                font-size: 15px;
+                line-height: 1.5;
+                padding: 12px;
+            }
+        }
+
+        /* 超小屏幕优化 */
+        @media (max-width: 480px) {
+            .toolbar {
+                padding: 4px 8px;
+            }
+            
+            .server-name {
+                font-size: 12px;
+                max-width: 100px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            
+            #messageInput {
+                width: 120px;
+            }
+            
+            .shortcut-btn {
+                min-width: 24px;
+                padding: 4px 2px;
+                font-size: 10px;
+            }
+            
+            .file-breadcrumb {
+                font-size: 13px;
+                padding: 8px;
+            }
+            
+            .editor-title {
+                font-size: 13px;
+            }
+            
+            .editor-btn {
+                padding: 6px 10px;
+                font-size: 14px;
+            }
+        }
+
+        /* 横屏优化 */
+        @media (orientation: landscape) and (max-height: 500px) {
+            .toolbar {
+                padding: 4px 8px;
+            }
+            
+            .screenshot-container {
+                margin-top: 40px;
+                padding: 5px;
+            }
+            
+            .file-manager {
+                margin-top: 40px;
+                padding: 5px;
+            }
+        }
+
+        /* 触摸设备优化 */
+        @media (pointer: coarse) {
+            .file-item:hover {
+                background: rgba(255, 255, 255, 0.05); /* 减少hover效果 */
+            }
+            
+            .file-item:active {
+                background: rgba(255, 255, 255, 0.2);
+                transform: scale(0.98);
+                transition: all 0.1s;
+            }
+            
+            .editor-btn:active,
+            .shortcut-btn:active,
+            .mode-switch:active {
+                transform: scale(0.95);
+                transition: all 0.1s;
+            }
+        }
+
+        /* 防止移动端滚动穿透 */
+        .file-editor.active {
+            position: fixed;
+            overflow: hidden;
+        }
+        
+        .file-editor.active body {
+            overflow: hidden;
+        }
+
+        /* 任务管理界面样式 */
+        .task-manager {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            margin-top: 48px;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        .task-manager.active {
+            display: flex;
+        }
+
+        .task-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .task-header h3 {
+            margin: 0;
+            color: #fff;
+            font-size: 16px;
+        }
+
+        .task-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #fff;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0 2px;
+            transition: all 0.2s;
+        }
+
+        .task-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .task-btn.primary {
+            background: #007acc;
+            border-color: #007acc;
+        }
+
+        .task-btn.primary:hover {
+            background: #005a9e;
+        }
+
+        .task-btn:disabled {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .task-list {
+            flex: 1;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 4px;
+            padding: 10px;
+        }
+
+        .task-empty {
+            text-align: center;
+            color: #666;
+            padding: 40px 20px;
+            font-size: 14px;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            margin: 8px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            border-left: 4px solid #007acc;
+        }
+
+        .task-item.running {
+            border-left-color: #4caf50;
+        }
+
+        .task-item.stopped {
+            border-left-color: #f44336;
+        }
+
+        .task-item.finished {
+            border-left-color: #666;
+        }
+
+        .task-info {
+            flex: 1;
+        }
+
+        .task-name {
+            color: #fff;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .task-command {
+            color: #888;
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        .task-status {
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .task-status.running {
+            color: #4caf50;
+        }
+
+        .task-status.stopped {
+            color: #f44336;
+        }
+
+        .task-status.finished {
+            color: #666;
+        }
+
+        .task-controls {
+            display: flex;
+            gap: 4px;
+        }
+
+        .task-control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 3px;
+            color: #fff;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            min-height: 28px;
+        }
+
+        .task-control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* 任务对话框 */
+        .task-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .task-dialog.active {
+            display: flex;
+        }
+
+        .task-dialog-content {
+            background: #1a1a1a;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .task-dialog-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .task-dialog-header h3 {
+            margin: 0;
+            color: #fff;
+            font-size: 18px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        .task-dialog-body {
+            padding: 20px;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+        }
+
+        .input-group label {
+            display: block;
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 6px;
+        }
+
+        .input-group input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            padding: 10px;
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .input-group input:focus {
+            border-color: #007acc;
+            background: rgba(255, 255, 255, 0.15);
+            outline: none;
+        }
+
+        .input-group input::placeholder {
+            color: #666;
+        }
+
+        .task-dialog-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 16px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* 任务输出窗口 */
+        .task-output {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #000;
+            z-index: 2500;
+            display: none;
+            flex-direction: column;
+        }
+
+        .task-output.active {
+            display: flex;
+        }
+
+        .task-output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.9);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .task-output-title {
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .task-output-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .task-output-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #fff;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .task-output-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .task-output-content {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .task-output-text {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            margin: 0;
+            background: #000;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
     <!-- 顶部工具栏 -->
     <div class="toolbar">
+        <!-- 左侧模式切换按钮 -->
+        <div class="mode-buttons">
+            <button class="mode-btn active" id="screenshotModeBtn" title="截屏模式">📷</button>
+            <button class="mode-btn" id="fileModeBtn" title="文件管理">📁</button>
+            <button class="mode-btn" id="taskModeBtn" title="任务管理">⚡</button>
+        </div>
+        
+        <!-- 中间服务器信息 -->
         <div class="server-info">
             <span class="server-name" id="serverName">连接中...</span>
             <div class="status-indicator" id="statusIndicator"></div>
         </div>
+        
+        <!-- 右侧输入区域 -->
         <div class="input-area">
             <input type="text" id="messageInput" placeholder="输入命令..." disabled>
             <div class="shortcut-buttons">
@@ -185,6 +889,80 @@
     <div class="screenshot-container">
         <img id="screenshotImage" alt="Claude 截屏">
         <div class="loading-text" id="loadingText">等待截屏...</div>
+    </div>
+
+    <!-- 文件管理区域 -->
+    <div class="file-manager" id="fileManager">
+        <div class="file-breadcrumb" id="fileBreadcrumb">项目根目录</div>
+        <div class="file-list" id="fileList">
+            <div class="loading">正在加载文件列表...</div>
+        </div>
+    </div>
+
+    <!-- 任务管理区域 -->
+    <div class="task-manager" id="taskManager">
+        <div class="task-header">
+            <h3>任务管理</h3>
+            <button class="task-btn primary" id="newTaskBtn">+ 新任务</button>
+        </div>
+        <div class="task-list" id="taskList">
+            <div class="task-empty">暂无运行任务</div>
+        </div>
+    </div>
+
+    <!-- 新任务对话框 -->
+    <div class="task-dialog" id="taskDialog">
+        <div class="task-dialog-content">
+            <div class="task-dialog-header">
+                <h3>创建新任务</h3>
+                <button class="close-btn" id="taskDialogCloseBtn">×</button>
+            </div>
+            <div class="task-dialog-body">
+                <div class="input-group">
+                    <label>任务名称:</label>
+                    <input type="text" id="taskNameInput" placeholder="例如: 构建项目" maxlength="50">
+                </div>
+                <div class="input-group">
+                    <label>执行命令:</label>
+                    <input type="text" id="taskCommandInput" placeholder="例如: npm run build" maxlength="200">
+                </div>
+                <div class="input-group">
+                    <label>工作目录:</label>
+                    <input type="text" id="taskWorkDirInput" placeholder="留空使用项目根目录" maxlength="200">
+                </div>
+            </div>
+            <div class="task-dialog-footer">
+                <button class="task-btn" id="taskDialogCancelBtn">取消</button>
+                <button class="task-btn primary" id="taskDialogCreateBtn">创建任务</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 任务输出窗口 -->
+    <div class="task-output" id="taskOutput">
+        <div class="task-output-header">
+            <div class="task-output-title" id="taskOutputTitle">任务输出</div>
+            <div class="task-output-controls">
+                <button class="task-output-btn" id="taskOutputCopyBtn">复制</button>
+                <button class="task-output-btn" id="taskOutputClearBtn">清空</button>
+                <button class="task-output-btn" id="taskOutputCloseBtn">关闭</button>
+            </div>
+        </div>
+        <div class="task-output-content">
+            <pre class="task-output-text" id="taskOutputText">等待任务输出...</pre>
+        </div>
+    </div>
+
+    <!-- 文件编辑器 -->
+    <div class="file-editor" id="fileEditor">
+        <div class="editor-toolbar">
+            <button class="editor-btn" id="editorCloseBtn">关闭</button>
+            <div class="editor-title" id="editorTitle">文件编辑器</div>
+            <button class="editor-btn primary" id="editorSaveBtn">保存</button>
+        </div>
+        <div class="editor-content">
+            <textarea class="editor-textarea" id="editorTextarea" placeholder="选择一个文本文件开始编辑..."></textarea>
+        </div>
     </div>
 
     <script src="chat.js"></script>
