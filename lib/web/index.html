@@ -123,14 +123,19 @@
             align-items: center;
             margin-top: 48px;
             padding: 10px;
+            overflow: auto;
+            min-height: calc(100vh - 58px);
         }
 
         #screenshotImage {
+            width: auto;
+            height: auto;
             max-width: 100%;
             max-height: 100%;
             border-radius: 4px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
             display: none;
+            object-fit: contain;
         }
 
         .loading-text {
