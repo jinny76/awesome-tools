@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>登录 - Claude Remote Dev</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Claude深色主题色彩 */
+            --bg-primary: #1a1a1a;
+            --bg-secondary: #2d2d2d;
+            --bg-tertiary: #3d3d3d;
+            --text-primary: #ffffff;
+            --text-secondary: #b3b3b3;
+            --text-muted: #666666;
+            --accent-primary: #ff6b35;
+            --accent-secondary: #4a90e2;
+            --border-color: #404040;
+            --success-color: #4caf50;
+            --error-color: #f44336;
+            --warning-color: #ff9800;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.6;
+        }
+
+        .login-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 48px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+            width: 100%;
+            max-width: 400px;
+            backdrop-filter: blur(20px);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            color: var(--accent-primary);
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .logo p {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 16px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-secondary);
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+        }
+
+        .form-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .login-button {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            background: var(--accent-primary);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 24px;
+            font-family: inherit;
+        }
+
+        .login-button:hover {
+            background: #e55a2b;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 53, 0.3);
+        }
+
+        .login-button:active {
+            transform: translateY(0);
+        }
+
+        .login-button:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .login-button .loading {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        .login-button.loading .button-text {
+            display: none;
+        }
+
+        .login-button.loading .loading {
+            display: block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: var(--error-color);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: none;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success-message {
+            background: var(--success-color);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: none;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .success-message.show {
+            display: block;
+        }
+
+        .footer {
+            text-align: center;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .footer p {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 480px) {
+            .login-container {
+                margin: 20px;
+                padding: 32px 24px;
+            }
+
+            .logo h1 {
+                font-size: 20px;
+            }
+
+            .logo-icon {
+                font-size: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <div class="logo-icon">🤖</div>
+            <h1>Claude Remote Dev</h1>
+            <p>请输入凭据以访问远程Claude</p>
+        </div>
+
+        <div class="error-message" id="errorMessage"></div>
+        <div class="success-message" id="successMessage"></div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label class="form-label" for="username">用户名</label>
+                <input 
+                    type="text" 
+                    id="username" 
+                    name="username" 
+                    class="form-input" 
+                    placeholder="请输入用户名" 
+                    required
+                    autocomplete="username"
+                >
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="password">密码</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    class="form-input" 
+                    placeholder="请输入密码" 
+                    required
+                    autocomplete="current-password"
+                >
+            </div>
+
+            <button type="submit" class="login-button" id="loginButton">
+                <span class="button-text">登录</span>
+                <div class="loading"></div>
+            </button>
+        </form>
+
+        <div class="footer">
+            <p>© 2025 Claude Remote Dev</p>
+        </div>
+    </div>
+
+    <script>
+        class LoginPage {
+            constructor() {
+                this.form = document.getElementById('loginForm');
+                this.usernameInput = document.getElementById('username');
+                this.passwordInput = document.getElementById('password');
+                this.loginButton = document.getElementById('loginButton');
+                this.errorMessage = document.getElementById('errorMessage');
+                this.successMessage = document.getElementById('successMessage');
+                
+                this.bindEvents();
+                this.usernameInput.focus();
+            }
+
+            bindEvents() {
+                this.form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.handleLogin();
+                });
+
+                // 回车键提交
+                [this.usernameInput, this.passwordInput].forEach(input => {
+                    input.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            this.handleLogin();
+                        }
+                    });
+                });
+            }
+
+            async handleLogin() {
+                const username = this.usernameInput.value.trim();
+                const password = this.passwordInput.value;
+
+                if (!username || !password) {
+                    this.showError('请输入用户名和密码');
+                    return;
+                }
+
+                this.setLoading(true);
+                this.hideMessages();
+
+                try {
+                    const response = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.showSuccess('登录成功，正在跳转...');
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 1500);
+                    } else {
+                        this.showError(data.message || '登录失败');
+                    }
+
+                } catch (error) {
+                    console.error('登录请求失败:', error);
+                    this.showError('网络错误，请稍后重试');
+                } finally {
+                    this.setLoading(false);
+                }
+            }
+
+            setLoading(isLoading) {
+                if (isLoading) {
+                    this.loginButton.classList.add('loading');
+                    this.loginButton.disabled = true;
+                } else {
+                    this.loginButton.classList.remove('loading');
+                    this.loginButton.disabled = false;
+                }
+            }
+
+            showError(message) {
+                this.errorMessage.textContent = message;
+                this.errorMessage.classList.add('show');
+                this.successMessage.classList.remove('show');
+            }
+
+            showSuccess(message) {
+                this.successMessage.textContent = message;
+                this.successMessage.classList.add('show');
+                this.errorMessage.classList.remove('show');
+            }
+
+            hideMessages() {
+                this.errorMessage.classList.remove('show');
+                this.successMessage.classList.remove('show');
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            new LoginPage();
+        });
+    </script>
+</body>
+</html>

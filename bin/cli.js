@@ -330,15 +330,19 @@ program
     }
   }));
 
+
 // === Dev Server 命令 ===
 program
   .command('dev-server')
   .alias('ds')
-  .description('Claude进程代理：启动claude命令并代理输入输出')
-  .option('-d, --dir <path>', '项目目录', process.cwd())
-  .option('--claude-cmd <command>', '指定Claude命令', 'claude')
-  .option('--status', '查看服务器状态')
-  .option('--stop', '停止服务器')
+  .description('多服务器Claude远程开发系统：支持Web界面、用户认证、WebSocket实时通信、深色主题')
+  .option('-w, --wizard', '启动配置向导')
+  .option('--list', '列出所有服务器配置')
+  .option('--status', '查看运行状态')
+  .option('--start <name>', '启动指定服务器')
+  .option('--stop [name]', '停止服务器 (不指定名称则停止所有)')
+  .option('--restart <name>', '重启指定服务器')
+  .option('--debug', '显示调试信息')
   .action(wrapAction('dev-server', async (options) => {
     try {
       await startDevServer(options);
