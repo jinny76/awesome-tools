@@ -48,16 +48,21 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "ansi-to-html": "^0.7.2",
+    "bcrypt": "^6.0.0",
     "chalk": "^5.5.0",
+    "chokidar": "^4.0.3",
     "cli-table3": "^0.6.5",
     "clipboardy": "^4.0.0",
     "commander": "^13.1.0",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.1.0",
     "mysql2": "^3.14.3",
     "ora": "^8.2.0",
     "pg": "^8.16.3",
     "qrcode": "^1.5.4",
     "read": "^4.1.0",
     "ssh2": "^1.16.0",
-    "ws": "^8.18.0"
+    "ws": "^8.18.3"
   }
 }

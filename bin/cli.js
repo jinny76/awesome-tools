@@ -11,6 +11,7 @@ const { startNotify } = require('../lib/commands/server-chan');
 const { startDatabase } = require('../lib/commands/database');
 const { startAnimationServer } = require('../lib/commands/animation-server');
 const browserToolsCommand = require('../lib/commands/browser-tools');
+const { startDevServer } = require('../lib/commands/dev-server');
 const CommandHistory = require('../lib/utils/command-history');
 
 const program = new Command();
@@ -329,6 +330,27 @@ program
     }
   }));
 
+// === Dev Server 命令 ===
+program
+  .command('dev-server')
+  .alias('ds')
+  .description('Claude进程代理：启动claude命令并代理输入输出')
+  .option('-d, --dir <path>', '项目目录', process.cwd())
+  .option('--claude-cmd <command>', '指定Claude命令', 'claude')
+  .option('--status', '查看服务器状态')
+  .option('--stop', '停止服务器')
+  .action(wrapAction('dev-server', async (options) => {
+    try {
+      await startDevServer(options);
+    } catch (error) {
+      console.error('❌ 错误:', error.message);
+      if (error.stack && options.debug) {
+        console.error(error.stack);
+      }
+      process.exit(1);
+    }
+  }));
+
 // === Browser Tools 命令 ===
 program
   .command('browser-tools')
@@ -371,6 +393,8 @@ function getCommandAlias() {
     'n': 'notify',
     'db': 'database',
     'as': 'animation-server',
+    'at': 'api-test',
+    'ds': 'dev-server',
     'bt': 'browser-tools'
   };
 }
@@ -383,7 +407,7 @@ function getFullCommandName(commandName) {
 
 // 获取所有有效命令（包括别名）
 function getAllValidCommands() {
-  const fullCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server', 'remote-server', 'screensaver', 'notify', 'database', 'animation-server', 'browser-tools'];
+  const fullCommands = ['git-stats', 'clean-code', 'debug-file', 'ffmpeg', 'share-server', 'remote-server', 'screensaver', 'notify', 'database', 'animation-server', 'api-test', 'dev-server', 'browser-tools'];
   const aliases = Object.keys(getCommandAlias());
   return [...fullCommands, ...aliases];
 }
