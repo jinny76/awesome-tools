@@ -15,8 +15,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             background: #000;
             color: #fff;
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             /* 移动端优化 */
@@ -31,14 +30,27 @@
             background: rgba(0, 0, 0, 0.8);
             padding: 8px 16px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
+            gap: 12px;
             backdrop-filter: blur(10px);
+            flex-shrink: 0; /* 防止工具栏被压缩 */
+            flex-wrap: wrap; /* 允许换行 */
+        }
+
+        /* 内容容器 */
+        .content-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .server-info {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            order: 1; /* 最左边 */
         }
 
         .server-name {
@@ -46,10 +58,24 @@
             color: #999;
         }
 
+        .mode-buttons {
+            display: flex;
+            gap: 4px;
+            order: 2; /* 状态之后 */
+        }
+
+        .shortcut-buttons {
+            display: flex;
+            gap: 4px;
+            order: 3; /* 模式按钮之后 */
+        }
+
         .input-area {
             display: flex;
             gap: 8px;
             align-items: center;
+            order: 4; /* 最右边 */
+            margin-left: auto; /* 推到最右边 */
         }
 
         #messageInput {
@@ -75,12 +101,12 @@
         .shortcut-btn {
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
-            padding: 4px 8px;
+            border-radius: 4px;
+            padding: 6px 10px;
             color: #fff;
             cursor: pointer;
-            font-size: 12px;
-            min-width: 32px;
+            font-size: 14px;
+            min-width: 40px;
             text-align: center;
             transition: all 0.2s;
         }
@@ -165,10 +191,8 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            margin-top: 48px;
             padding: 10px;
             overflow: auto;
-            min-height: calc(100vh - 58px);
         }
 
         #screenshotImage {
@@ -208,7 +232,6 @@
             flex: 1;
             display: none;
             flex-direction: column;
-            margin-top: 48px;
             padding: 10px;
             overflow: hidden;
         }
@@ -383,16 +406,20 @@
         @media (max-width: 768px) {
             .toolbar {
                 padding: 6px 12px;
-                flex-wrap: wrap;
             }
             
+            /* 竖屏时输入区域换到第二行，占满整行 */
             .input-area {
-                flex-wrap: wrap;
-                gap: 4px;
+                order: 5; /* 最后一个元素，会换到新行 */
+                width: 100%; /* 占满整行 */
+                margin-left: 0; /* 重置左边距 */
+                gap: 8px;
             }
             
+            /* 输入框在移动端占更多空间 */
             #messageInput {
-                width: 150px;
+                flex: 1; /* 占用所有剩余空间 */
+                min-width: 0; /* 允许收缩 */
                 font-size: 16px; /* 防止iOS缩放 */
             }
             
@@ -445,6 +472,7 @@
                 padding: 4px 8px;
             }
             
+            
             .server-name {
                 font-size: 12px;
                 max-width: 100px;
@@ -481,17 +509,44 @@
         /* 横屏优化 */
         @media (orientation: landscape) and (max-height: 500px) {
             .toolbar {
-                padding: 4px 8px;
+                padding: 2px 8px; /* 减少工具栏的padding以节省垂直空间 */
             }
             
-            .screenshot-container {
-                margin-top: 40px;
-                padding: 5px;
+            .server-name {
+                font-size: 12px; /* 减小字体以节省空间 */
             }
             
-            .file-manager {
-                margin-top: 40px;
-                padding: 5px;
+            #messageInput {
+                height: 28px; /* 减小输入框高度 */
+                font-size: 14px;
+            }
+            
+            .shortcut-btn, #sendButton {
+                padding: 2px 6px; /* 减小按钮padding */
+                font-size: 12px;
+            }
+            
+            .mode-btn {
+                padding: 4px 6px; /* 减小模式按钮padding */
+            }
+            
+            .content-container {
+                overflow-y: auto; /* 允许内容区域滚动 */
+            }
+            
+            .screenshot-container,
+            .file-manager,
+            .task-manager,
+            .tunnel-manager {
+                padding: 5px; /* 减少内容区域padding */
+                min-height: 0; /* 允许内容区域压缩 */
+            }
+            
+            /* 确保隧道和任务项在横屏时保持正常间距 */
+            .task-item,
+            .tunnel-item {
+                margin: 4px 0; /* 横屏时稍微减少间距但保持可见 */
+                padding: 8px; /* 减少内部padding以节省空间 */
             }
         }
 
@@ -530,7 +585,6 @@
             flex: 1;
             display: none;
             flex-direction: column;
-            margin-top: 48px;
             padding: 10px;
             overflow: hidden;
         }
@@ -600,6 +654,9 @@
             color: #666;
             padding: 40px 20px;
             font-size: 14px;
+            white-space: normal;
+            word-wrap: break-word;
+            line-height: 1.5;
         }
 
         .task-item {
@@ -850,63 +907,301 @@
             font-size: 13px;
             line-height: 1.4;
             white-space: pre-wrap;
+        }
+
+        /* 日志行样式 */
+        .log-line {
+            margin: 2px 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .log-content {
+            /* ANSI 转换的 HTML 内容会包含内联样式，保持原有颜色 */
+            white-space: pre-wrap;
+        }
+
+        /* ANSI 转换后的常见颜色覆盖 */
+        .log-content span {
+            font-family: inherit;
+            font-size: inherit;
+        }
             word-break: break-all;
+        }
+
+        /* 端口映射界面样式 */
+        .tunnel-manager {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        .tunnel-manager.active {
+            display: flex;
+        }
+
+        .tunnel-header {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .tunnel-header h3 {
+            margin: 0;
+            color: #fff;
+            font-size: 16px;
+        }
+
+        .tunnel-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: #fff;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 14px;
+            margin: 0 2px;
+            transition: all 0.2s;
+        }
+
+        .tunnel-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .tunnel-btn.primary {
+            background: #007acc;
+            border-color: #007acc;
+        }
+
+        .tunnel-btn.primary:hover {
+            background: #005a9e;
+        }
+
+        .tunnel-btn:disabled {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
+            color: #666;
+            cursor: not-allowed;
+        }
+
+        .tunnel-list {
+            flex: 1;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 4px;
+            padding: 10px;
+        }
+
+        .tunnel-empty {
+            text-align: center;
+            color: #666;
+            padding: 40px 20px;
+            font-size: 14px;
+            white-space: normal;
+            word-wrap: break-word;
+            line-height: 1.5;
+        }
+
+        .tunnel-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            margin: 8px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            border-left: 4px solid #007acc;
+        }
+
+        .tunnel-item.connected {
+            border-left-color: #4caf50;
+        }
+
+        .tunnel-item.error {
+            border-left-color: #f44336;
+        }
+
+        .tunnel-info {
+            flex: 1;
+        }
+
+        .tunnel-name {
+            color: #fff;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .tunnel-mapping {
+            color: #888;
+            font-size: 12px;
+            font-family: monospace;
+        }
+
+        .tunnel-status {
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .tunnel-status.connected {
+            color: #4caf50;
+        }
+
+        .tunnel-status.error {
+            color: #f44336;
+        }
+
+        .tunnel-status.connecting {
+            color: #ff9800;
+        }
+
+        .tunnel-controls {
+            display: flex;
+            gap: 4px;
+        }
+
+        .tunnel-control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 3px;
+            color: #fff;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            min-height: 28px;
+        }
+
+        .tunnel-control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* 端口映射对话框 */
+        .tunnel-dialog {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .tunnel-dialog.active {
+            display: flex;
+        }
+
+        .tunnel-dialog-content {
+            background: #1a1a1a;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .tunnel-dialog-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tunnel-dialog-header h3 {
+            margin: 0;
+            color: #fff;
+            font-size: 18px;
+        }
+
+        .tunnel-dialog-body {
+            padding: 20px;
+        }
+
+        .tunnel-dialog-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 16px 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
     </style>
 </head>
 <body>
     <!-- 顶部工具栏 -->
     <div class="toolbar">
-        <!-- 左侧模式切换按钮 -->
+        <!-- 状态信息 -->
+        <div class="server-info">
+            <div class="status-indicator" id="statusIndicator"></div>
+            <span class="server-name" id="serverName">连接中...</span>
+        </div>
+        
+        <!-- 模式切换按钮 -->
         <div class="mode-buttons">
             <button class="mode-btn active" id="screenshotModeBtn" title="截屏模式">📷</button>
             <button class="mode-btn" id="fileModeBtn" title="文件管理">📁</button>
             <button class="mode-btn" id="taskModeBtn" title="任务管理">⚡</button>
+            <button class="mode-btn" id="tunnelModeBtn" title="外网隧道">🌐</button>
         </div>
         
-        <!-- 中间服务器信息 -->
-        <div class="server-info">
-            <span class="server-name" id="serverName">连接中...</span>
-            <div class="status-indicator" id="statusIndicator"></div>
+        <!-- 快捷按钮 -->
+        <div class="shortcut-buttons">
+            <button class="shortcut-btn" id="upBtn" title="上箭头" disabled>↑</button>
+            <button class="shortcut-btn" id="downBtn" title="下箭头" disabled>↓</button>
+            <button class="shortcut-btn" id="enterBtn" title="回车" disabled>↵</button>
+            <button class="shortcut-btn" id="altMBtn" title="Alt+M" disabled>Alt+M</button>
         </div>
         
-        <!-- 右侧输入区域 -->
+        <!-- 输入区域 -->
         <div class="input-area">
             <input type="text" id="messageInput" placeholder="输入命令..." disabled>
-            <div class="shortcut-buttons">
-                <button class="shortcut-btn" id="upBtn" title="上箭头" disabled>↑</button>
-                <button class="shortcut-btn" id="downBtn" title="下箭头" disabled>↓</button>
-                <button class="shortcut-btn" id="enterBtn" title="回车" disabled>↵</button>
-                <button class="shortcut-btn" id="altMBtn" title="Alt+M" disabled>Alt+M</button>
-                <button class="shortcut-btn" id="ctrlCBtn" title="Ctrl+C" disabled>Ctrl+C</button>
-                <button class="shortcut-btn" id="ctrlVBtn" title="Ctrl+V" disabled>Ctrl+V</button>
-            </div>
             <button id="sendButton" disabled>发送</button>
         </div>
     </div>
 
-    <!-- 截屏显示区域 -->
-    <div class="screenshot-container">
-        <img id="screenshotImage" alt="Claude 截屏">
-        <div class="loading-text" id="loadingText">等待截屏...</div>
-    </div>
-
-    <!-- 文件管理区域 -->
-    <div class="file-manager" id="fileManager">
-        <div class="file-breadcrumb" id="fileBreadcrumb">项目根目录</div>
-        <div class="file-list" id="fileList">
-            <div class="loading">正在加载文件列表...</div>
+    <!-- 内容容器 -->
+    <div class="content-container">
+        <!-- 截屏显示区域 -->
+        <div class="screenshot-container">
+            <img id="screenshotImage" alt="Claude 截屏">
+            <div class="loading-text" id="loadingText">等待截屏...</div>
         </div>
-    </div>
 
-    <!-- 任务管理区域 -->
-    <div class="task-manager" id="taskManager">
-        <div class="task-header">
-            <h3>任务管理</h3>
-            <button class="task-btn primary" id="newTaskBtn">+ 新任务</button>
+        <!-- 文件管理区域 -->
+        <div class="file-manager" id="fileManager">
+            <div class="file-breadcrumb" id="fileBreadcrumb">项目根目录</div>
+            <div class="file-list" id="fileList">
+                <div class="loading">正在加载文件列表...</div>
+            </div>
         </div>
-        <div class="task-list" id="taskList">
-            <div class="task-empty">暂无运行任务</div>
+
+        <!-- 任务管理区域 -->
+        <div class="task-manager" id="taskManager">
+            <div class="task-header">
+                <h3>任务管理</h3>
+                <button class="task-btn primary" id="newTaskBtn">+ 新任务</button>
+            </div>
+            <div class="task-list" id="taskList">
+                <div class="task-empty">暂无运行任务</div>
+            </div>
+        </div>
+
+        <!-- 端口映射管理区域 -->
+        <div class="task-manager" id="tunnelManager">
+            <div class="task-header">
+                <h3>外网隧道</h3>
+                <button class="task-btn primary" id="newTunnelBtn">+ 新隧道</button>
+            </div>
+            <div class="task-list" id="tunnelList">
+                <div class="task-empty">暂无外网隧道</div>
+            </div>
         </div>
     </div>
 
@@ -950,6 +1245,41 @@
         </div>
         <div class="task-output-content">
             <pre class="task-output-text" id="taskOutputText">等待任务输出...</pre>
+        </div>
+    </div>
+
+    <!-- 新端口映射对话框 -->
+    <div class="tunnel-dialog" id="tunnelDialog">
+        <div class="tunnel-dialog-content">
+            <div class="tunnel-dialog-header">
+                <h3>创建外网隧道</h3>
+                <button class="close-btn" id="tunnelDialogCloseBtn">×</button>
+            </div>
+            <div class="tunnel-dialog-body">
+                <div class="input-group">
+                    <label>隧道名称:</label>
+                    <input type="text" id="tunnelNameInput" placeholder="例如: 开发服务器" maxlength="50">
+                </div>
+                <div class="input-group">
+                    <label>本地端口:</label>
+                    <input type="number" id="tunnelLocalPortInput" placeholder="例如: 3000" min="1" max="65535" required>
+                </div>
+                <div class="input-group">
+                    <label>协议类型:</label>
+                    <select id="tunnelProtocolSelect">
+                        <option value="http">HTTP</option>
+                        <option value="tcp">TCP</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>子域名 (可选):</label>
+                    <input type="text" id="tunnelSubdomainInput" placeholder="例如: myapp (结果: myapp.ngrok.io)" maxlength="50">
+                </div>
+            </div>
+            <div class="tunnel-dialog-footer">
+                <button class="tunnel-btn" id="tunnelDialogCancelBtn">取消</button>
+                <button class="tunnel-btn primary" id="tunnelDialogCreateBtn">创建隧道</button>
+            </div>
         </div>
     </div>
 
