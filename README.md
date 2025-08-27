@@ -30,6 +30,7 @@ ats cc -d ./vue-project --dry-run  # Vue死代码检测
 - **[FFmpeg工具集](docs/commands/ffmpeg.md)** - 音视频处理、格式转换、流媒体推送
 
 ### 服务器工具
+- **[开发服务器](docs/dev-server-working-implementation.md)** - Claude远程开发环境，支持文件管理、任务管理、外网隧道
 - **[文件分享服务器](docs/commands/share-server.md)** - 快速搭建本地文件分享服务
 - **[SSH端口转发](docs/commands/remote-server.md)** - 简化的SSH隧道管理工具
 - **[动画WebSocket服务器](docs/commands/animation-server.md)** - 翠鸟3D引擎集成服务
@@ -48,6 +49,7 @@ ats cc -d ./vue-project --dry-run  # Vue死代码检测
 
 | 命令 | 缩写 | 说明 |
 |------|------|------|
+| `dev-server` | `ds` | Claude远程开发服务器 |
 | `git-stats` | `gs` | Git提交历史分析 |
 | `clean-code` | `cc` | Vue死代码清理 |
 | `debug-file` | `df` | 调试文件引用关系 |
