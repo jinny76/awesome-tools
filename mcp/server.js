@@ -515,6 +515,131 @@ class AwesomeToolsMCPServer {
               },
               required: ["script"]
             }
+          },
+          {
+            name: "get_active_scenes",
+            description: "获取当前所有活跃场景的列表，包括场景唯一标识、昵称、最后心跳时间等信息",
+            inputSchema: {
+              type: "object",
+              properties: {
+                serverUrl: {
+                  type: "string",
+                  description: "动画服务器URL",
+                  default: "ws://localhost:8081/animation"
+                }
+              },
+              required: []
+            }
+          },
+          {
+            name: "get_scene_by_id",
+            description: "根据场景uniqueId获取特定场景的详细信息",
+            inputSchema: {
+              type: "object",
+              properties: {
+                uniqueId: {
+                  type: "string",
+                  description: "场景唯一标识符"
+                },
+                serverUrl: {
+                  type: "string",
+                  description: "动画服务器URL",
+                  default: "ws://localhost:8081/animation"
+                }
+              },
+              required: ["uniqueId"]
+            }
+          },
+          {
+            name: "set_scene_nickname",
+            description: "为场景设置友好的昵称",
+            inputSchema: {
+              type: "object",
+              properties: {
+                uniqueId: {
+                  type: "string",
+                  description: "场景唯一标识符"
+                },
+                nickname: {
+                  type: "string",
+                  description: "新的场景昵称"
+                },
+                serverUrl: {
+                  type: "string",
+                  description: "动画服务器URL",
+                  default: "ws://localhost:8081/animation"
+                }
+              },
+              required: ["uniqueId", "nickname"]
+            }
+          },
+          {
+            name: "copy_scene_configuration",
+            description: "在场景之间复制配置（'同样式'复制功能），支持相机、材质、灯光等配置复制",
+            inputSchema: {
+              type: "object",
+              properties: {
+                sourceUniqueId: {
+                  type: "string",
+                  description: "源场景唯一标识符"
+                },
+                targetUniqueId: {
+                  type: "string",
+                  description: "目标场景唯一标识符"
+                },
+                configType: {
+                  type: "string",
+                  description: "配置类型",
+                  enum: ["all", "camera", "materials", "lighting", "environment"],
+                  default: "all"
+                },
+                serverUrl: {
+                  type: "string",
+                  description: "动画服务器URL",
+                  default: "ws://localhost:8081/animation"
+                }
+              },
+              required: ["sourceUniqueId", "targetUniqueId"]
+            }
+          },
+          {
+            name: "cleanup_inactive_scenes",
+            description: "清理非活跃场景（长时间无心跳的场景）",
+            inputSchema: {
+              type: "object",
+              properties: {
+                maxAge: {
+                  type: "number",
+                  description: "最大非活跃时间（秒）",
+                  default: 300
+                },
+                serverUrl: {
+                  type: "string",
+                  description: "动画服务器URL",
+                  default: "ws://localhost:8081/animation"
+                }
+              },
+              required: []
+            }
+          },
+          {
+            name: "get_scene_heartbeat_status",
+            description: "获取场景心跳状态，检查场景连接健康度",
+            inputSchema: {
+              type: "object",
+              properties: {
+                uniqueId: {
+                  type: "string",
+                  description: "场景唯一标识符（可选，不提供则返回所有场景状态）"
+                },
+                serverUrl: {
+                  type: "string",
+                  description: "动画服务器URL",
+                  default: "ws://localhost:8081/animation"
+                }
+              },
+              required: []
+            }
           }
         ]
       };
@@ -558,6 +683,24 @@ class AwesomeToolsMCPServer {
           
           case "custom_script_execute":
             return await this.handleCustomScriptExecute(args);
+          
+          case "get_active_scenes":
+            return await this.handleGetActiveScenes(args);
+          
+          case "get_scene_by_id":
+            return await this.handleGetSceneById(args);
+          
+          case "set_scene_nickname":
+            return await this.handleSetSceneNickname(args);
+          
+          case "copy_scene_configuration":
+            return await this.handleCopySceneConfiguration(args);
+          
+          case "cleanup_inactive_scenes":
+            return await this.handleCleanupInactiveScenes(args);
+          
+          case "get_scene_heartbeat_status":
+            return await this.handleGetSceneHeartbeatStatus(args);
           
           default:
             throw new Error(`Unknown tool: ${name}`);
@@ -1910,6 +2053,413 @@ class AwesomeToolsMCPServer {
           {
             type: "text",
             text: `❌ 自定义脚本执行失败：${error.message}\n\n**可能的原因：**\n1. 动画服务器未运行 (确保运行: ats as --port 8081)\n2. 翠鸟场景检查器未连接\n3. 脚本语法错误或包含不安全代码\n4. 脚本执行超时\n\n**调试建议：**\n- 检查服务器状态: http://localhost:8081/status\n- 查看浏览器控制台的错误信息\n- 确认脚本不包含危险的API调用\n- 使用 scene_inspect 工具确认场景状态`
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+
+  /**
+   * 处理获取活跃场景列表
+   */
+  async handleGetActiveScenes(args) {
+    const { serverUrl = 'ws://localhost:8081/animation' } = args;
+
+    try {
+      // 通过HTTP API获取活跃场景信息
+      const apiUrl = serverUrl.replace('ws://', 'http://').replace('/animation', '/api/scenes');
+      
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const scenes = await response.json();
+      
+      // 过滤出真正活跃的场景（心跳在60秒内）
+      const now = Date.now();
+      const activeScenes = scenes.filter(scene => 
+        scene.isActive && scene.lastHeartbeat && (now - scene.lastHeartbeat) < 60000
+      );
+
+      let text = `🎬 活跃场景列表\n\n`;
+      text += `**发现 ${activeScenes.length} 个活跃场景**\n\n`;
+
+      if (activeScenes.length > 0) {
+        activeScenes.forEach((scene, index) => {
+          const heartbeatAge = Math.floor((now - scene.lastHeartbeat) / 1000);
+          text += `**${index + 1}. ${scene.nickname}**\n`;
+          text += `- **唯一标识:** \`${scene.uniqueId}\`\n`;
+          text += `- **引擎:** ${scene.engine} ${scene.engineVersion || ''}\n`;
+          text += `- **最后心跳:** ${heartbeatAge}秒前\n`;
+          if (scene.performance) {
+            text += `- **性能:** ${scene.performance.fps || 'N/A'}FPS\n`;
+          }
+          text += `- **连接时间:** ${new Date(scene.connectedAt).toLocaleString()}\n`;
+          text += '\n';
+        });
+      } else {
+        text += `💤 当前没有活跃的场景\n\n`;
+        text += `**可能原因:**\n`;
+        text += `1. 没有场景连接到动画服务器\n`;
+        text += `2. 场景心跳超时（超过60秒）\n`;
+        text += `3. 动画服务器重启清空了场景缓存\n`;
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: text
+          }
+        ]
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `❌ 获取活跃场景失败：${error.message}\n\n**调试建议：**\n- 确保动画服务器运行: ats as --port 8081\n- 检查服务器状态: ${serverUrl.replace('ws://', 'http://').replace('/animation', '/status')}`
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+
+  /**
+   * 处理根据ID获取场景信息
+   */
+  async handleGetSceneById(args) {
+    const { uniqueId, serverUrl = 'ws://localhost:8081/animation' } = args;
+
+    try {
+      const apiUrl = serverUrl.replace('ws://', 'http://').replace('/animation', '/api/scenes');
+      
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const scenes = await response.json();
+      const scene = scenes.find(s => s.uniqueId === uniqueId);
+      
+      if (!scene) {
+        throw new Error(`场景 "${uniqueId}" 不存在`);
+      }
+
+      const now = Date.now();
+      const heartbeatAge = Math.floor((now - scene.lastHeartbeat) / 1000);
+      const connectionAge = Math.floor((now - scene.connectedAt) / 1000);
+
+      let text = `🎭 场景详情\n\n`;
+      text += `**场景名称:** ${scene.nickname}\n`;
+      text += `**唯一标识:** \`${scene.uniqueId}\`\n`;
+      text += `**引擎信息:** ${scene.engine} ${scene.engineVersion || ''}\n`;
+      text += `**活跃状态:** ${scene.isActive ? '✅ 活跃' : '❌ 非活跃'}\n`;
+      text += `**最后心跳:** ${heartbeatAge}秒前\n`;
+      text += `**连接时长:** ${connectionAge}秒\n\n`;
+
+      if (scene.performance) {
+        text += `**性能信息:**\n`;
+        text += `- FPS: ${scene.performance.fps || 'N/A'}\n`;
+        text += `- 三角形数: ${scene.performance.triangles || 'N/A'}\n`;
+        text += `- 绘制调用: ${scene.performance.drawCalls || 'N/A'}\n\n`;
+      }
+
+      if (scene.metadata) {
+        text += `**场景元数据:**\n`;
+        text += `- 节点数量: ${scene.metadata.nodeCount || 0}\n`;
+        if (scene.metadata.url) {
+          text += `- 页面URL: ${scene.metadata.url}\n`;
+        }
+        text += '\n';
+      }
+
+      if (scene.config) {
+        text += `**配置信息:**\n`;
+        if (scene.config.cameras) {
+          text += `- 相机数量: ${Array.isArray(scene.config.cameras) ? scene.config.cameras.length : 'N/A'}\n`;
+        }
+        if (scene.config.materials) {
+          text += `- 材质数量: ${Array.isArray(scene.config.materials) ? scene.config.materials.length : 'N/A'}\n`;
+        }
+        if (scene.config.lighting) {
+          text += `- 灯光数量: ${Array.isArray(scene.config.lighting) ? scene.config.lighting.length : 'N/A'}\n`;
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: text
+          }
+        ]
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `❌ 获取场景信息失败：${error.message}`
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+
+  /**
+   * 处理设置场景昵称
+   */
+  async handleSetSceneNickname(args) {
+    const { uniqueId, nickname, serverUrl = 'ws://localhost:8081/animation' } = args;
+
+    try {
+      // 发送昵称更新请求到动画服务器
+      const apiUrl = serverUrl.replace('ws://', 'http://').replace('/animation', '/api/scene/set_nickname');
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ uniqueId, nickname })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `✅ 场景昵称更新成功\n\n**场景:** \`${uniqueId}\`\n**新昵称:** ${nickname}\n\n💡 昵称已更新，下次获取场景列表时将显示新名称。`
+          }
+        ]
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `❌ 设置场景昵称失败：${error.message}\n\n**注意:** 这个功能需要动画服务器支持昵称设置API`
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+
+  /**
+   * 处理场景配置复制
+   */
+  async handleCopySceneConfiguration(args) {
+    const { sourceUniqueId, targetUniqueId, configType = 'all', serverUrl = 'ws://localhost:8081/animation' } = args;
+
+    try {
+      const apiUrl = serverUrl.replace('ws://', 'http://').replace('/animation', '/api/scene/copy_config');
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sourceUniqueId,
+          targetUniqueId,
+          configType
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      let text = `🔄 配置复制完成\n\n`;
+      text += `**源场景:** \`${sourceUniqueId}\`\n`;
+      text += `**目标场景:** \`${targetUniqueId}\`\n`;
+      text += `**复制类型:** ${configType}\n\n`;
+
+      if (result.copiedItems) {
+        text += `**已复制的配置项:**\n`;
+        Object.keys(result.copiedItems).forEach(key => {
+          text += `- ${key}: ${result.copiedItems[key]} 项\n`;
+        });
+      }
+
+      text += `\n✅ 配置复制成功完成！目标场景现在具有与源场景相同的${configType === 'all' ? '所有' : configType}配置。`;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: text
+          }
+        ]
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `❌ 配置复制失败：${error.message}\n\n**可能原因:**\n1. 源场景或目标场景不存在\n2. 场景配置数据不完整\n3. 动画服务器不支持配置复制API\n\n**建议先使用 get_active_scenes 确认场景存在**`
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+
+  /**
+   * 处理清理非活跃场景
+   */
+  async handleCleanupInactiveScenes(args) {
+    const { maxAge = 300, serverUrl = 'ws://localhost:8081/animation' } = args;
+
+    try {
+      const apiUrl = serverUrl.replace('ws://', 'http://').replace('/animation', '/api/scene/cleanup');
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ maxAge })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      let text = `🧹 场景清理完成\n\n`;
+      text += `**清理条件:** 非活跃时间超过 ${maxAge} 秒\n`;
+      text += `**清理数量:** ${result.cleanedCount || 0} 个场景\n\n`;
+
+      if (result.cleanedScenes && result.cleanedScenes.length > 0) {
+        text += `**已清理的场景:**\n`;
+        result.cleanedScenes.forEach((scene, index) => {
+          text += `${index + 1}. ${scene.nickname} (\`${scene.uniqueId}\`)\n`;
+        });
+        text += '\n';
+      }
+
+      text += result.cleanedCount > 0 
+        ? '✅ 清理完成！释放了服务器内存空间。'
+        : '💤 没有需要清理的场景，所有场景都在活跃状态。';
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: text
+          }
+        ]
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `❌ 清理场景失败：${error.message}\n\n**注意:** 动画服务器会自动定期清理，手动清理仅在需要时使用`
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+
+  /**
+   * 处理获取场景心跳状态
+   */
+  async handleGetSceneHeartbeatStatus(args) {
+    const { uniqueId, serverUrl = 'ws://localhost:8081/animation' } = args;
+
+    try {
+      const apiUrl = serverUrl.replace('ws://', 'http://').replace('/animation', '/api/scenes');
+      
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const scenes = await response.json();
+      
+      let targetScenes = uniqueId 
+        ? scenes.filter(s => s.uniqueId === uniqueId)
+        : scenes;
+
+      if (targetScenes.length === 0) {
+        const message = uniqueId 
+          ? `场景 "${uniqueId}" 不存在`
+          : '当前没有任何场景连接';
+        throw new Error(message);
+      }
+
+      const now = Date.now();
+      
+      let text = `💓 场景心跳状态${uniqueId ? ` (${uniqueId})` : ''}\n\n`;
+
+      targetScenes.forEach((scene, index) => {
+        const heartbeatAge = (now - scene.lastHeartbeat) / 1000;
+        const isHealthy = heartbeatAge < 60; // 60秒内为健康
+        const healthStatus = isHealthy ? '✅ 健康' : '⚠️ 超时';
+        
+        if (targetScenes.length > 1) {
+          text += `**${index + 1}. ${scene.nickname}**\n`;
+        }
+        
+        text += `**心跳状态:** ${healthStatus}\n`;
+        text += `**最后心跳:** ${Math.floor(heartbeatAge)}秒前\n`;
+        text += `**活跃状态:** ${scene.isActive ? '活跃' : '非活跃'}\n`;
+        
+        if (scene.heartbeatAge !== undefined) {
+          text += `**心跳延迟:** ${scene.heartbeatAge}ms\n`;
+        }
+        
+        if (scene.performance) {
+          text += `**当前FPS:** ${scene.performance.fps || 'N/A'}\n`;
+        }
+        
+        text += '\n';
+      });
+
+      // 添加健康建议
+      const unhealthyScenes = targetScenes.filter(s => (now - s.lastHeartbeat) / 1000 >= 60);
+      if (unhealthyScenes.length > 0) {
+        text += `⚠️ **发现 ${unhealthyScenes.length} 个心跳异常的场景**\n\n`;
+        text += `**建议操作:**\n`;
+        text += `1. 检查浏览器页面是否还在活跃状态\n`;
+        text += `2. 确认网络连接正常\n`;
+        text += `3. 考虑刷新页面重新连接\n`;
+        text += `4. 使用 cleanup_inactive_scenes 清理超时场景`;
+      } else {
+        text += `✅ 所有场景心跳正常！`;
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: text
+          }
+        ]
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `❌ 获取心跳状态失败：${error.message}`
           }
         ],
         isError: true
