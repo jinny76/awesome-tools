@@ -125,143 +125,13 @@ class ApiTestMCPServer {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
         tools: [
-          // === 环境配置管理 ===
+          // === 环境状态查询 ===
           {
-            name: "test_env_create",
-            description: "创建测试环境配置",
-            inputSchema: {
-              type: "object",
-              properties: {
-                name: {
-                  type: "string",
-                  description: "环境名称"
-                },
-                baseUrl: {
-                  type: "string",
-                  description: "API基础URL"
-                },
-                swaggerUrl: {
-                  type: "string",
-                  description: "Swagger文档URL路径"
-                },
-                authConfig: {
-                  type: "object",
-                  description: "认证配置",
-                  properties: {
-                    type: {
-                      type: "string",
-                      enum: ["jwt", "session", "basic"],
-                      description: "认证类型"
-                    },
-                    loginEndpoint: {
-                      type: "string",
-                      description: "登录接口路径"
-                    },
-                    username: {
-                      type: "string",
-                      description: "用户名"
-                    },
-                    password: {
-                      type: "string",
-                      description: "密码"
-                    },
-                    tokenField: {
-                      type: "string",
-                      description: "响应中token字段名"
-                    },
-                    headerName: {
-                      type: "string",
-                      description: "请求头名称"
-                    },
-                    headerPrefix: {
-                      type: "string",
-                      description: "请求头前缀"
-                    }
-                  }
-                },
-                database: {
-                  type: "object",
-                  description: "数据库配置",
-                  properties: {
-                    type: {
-                      type: "string",
-                      enum: ["mysql", "postgres"],
-                      description: "数据库类型"
-                    },
-                    host: {
-                      type: "string",
-                      description: "数据库主机"
-                    },
-                    port: {
-                      type: "number",
-                      description: "数据库端口"
-                    },
-                    database: {
-                      type: "string",
-                      description: "数据库名"
-                    },
-                    user: {
-                      type: "string",
-                      description: "用户名"
-                    },
-                    password: {
-                      type: "string",
-                      description: "密码"
-                    }
-                  }
-                }
-              },
-              required: ["name", "baseUrl"]
-            }
-          },
-          {
-            name: "test_env_list",
-            description: "列出所有测试环境",
+            name: "test_env_get_active",
+            description: "获取当前活动环境信息（只读）",
             inputSchema: {
               type: "object",
               properties: {}
-            }
-          },
-          {
-            name: "test_env_get",
-            description: "获取指定环境配置",
-            inputSchema: {
-              type: "object",
-              properties: {
-                name: {
-                  type: "string",
-                  description: "环境名称"
-                }
-              },
-              required: ["name"]
-            }
-          },
-          {
-            name: "test_env_set_active",
-            description: "设置当前活动环境",
-            inputSchema: {
-              type: "object",
-              properties: {
-                name: {
-                  type: "string",
-                  description: "环境名称"
-                }
-              },
-              required: ["name"]
-            }
-          },
-          {
-            name: "test_env_delete",
-            description: "删除测试环境",
-            inputSchema: {
-              type: "object",
-              properties: {
-                name: {
-                  type: "string",
-                  description: "环境名称"
-                }
-              },
-              required: ["name"]
             }
           },
           
@@ -358,23 +228,6 @@ class ApiTestMCPServer {
           
           // === 认证管理 ===
           {
-            name: "auth_login",
-            description: "执行登录并获取认证token",
-            inputSchema: {
-              type: "object",
-              properties: {
-                username: {
-                  type: "string",
-                  description: "用户名（可选，默认使用环境配置）"
-                },
-                password: {
-                  type: "string",
-                  description: "密码（可选，默认使用环境配置）"
-                }
-              }
-            }
-          },
-          {
             name: "auth_validate",
             description: "验证当前认证是否有效",
             inputSchema: {
@@ -388,6 +241,25 @@ class ApiTestMCPServer {
             inputSchema: {
               type: "object",
               properties: {}
+            }
+          },
+          {
+            name: "auth_set_token",
+            description: "手动设置认证token（用于已知token的情况）",
+            inputSchema: {
+              type: "object",
+              properties: {
+                token: {
+                  type: "string",
+                  description: "认证token"
+                },
+                tokenType: {
+                  type: "string",
+                  enum: ["jwt", "session", "basic", "bearer"],
+                  description: "Token类型（可选，默认根据环境配置）"
+                }
+              },
+              required: ["token"]
             }
           },
           
@@ -757,17 +629,9 @@ class ApiTestMCPServer {
 
       try {
         switch (name) {
-          // 环境配置管理
-          case "test_env_create":
-            return await this.handleEnvCreate(args);
-          case "test_env_list":
-            return await this.handleEnvList(args);
-          case "test_env_get":
-            return await this.handleEnvGet(args);
-          case "test_env_set_active":
-            return await this.handleEnvSetActive(args);
-          case "test_env_delete":
-            return await this.handleEnvDelete(args);
+          // 环境状态查询
+          case "test_env_get_active":
+            return await this.handleEnvGetActive(args);
           
           // API信息获取
           case "api_fetch_swagger":
@@ -782,12 +646,12 @@ class ApiTestMCPServer {
             return await this.handleGetEndpoints(args);
           
           // 认证管理
-          case "auth_login":
-            return await this.handleAuthLogin(args);
           case "auth_validate":
             return await this.handleAuthValidate(args);
           case "auth_get_token":
             return await this.handleAuthGetToken(args);
+          case "auth_set_token":
+            return await this.handleAuthSetToken(args);
           
           // 测试执行
           case "test_execute_request":
@@ -854,128 +718,61 @@ class ApiTestMCPServer {
     });
   }
 
-  // === 环境配置管理实现 ===
+  // === 环境状态查询实现 ===
   
-  async handleEnvCreate(args) {
-    const { name, baseUrl, swaggerUrl, authConfig, database } = args;
-    
-    const data = JSON.parse(await fs.readFile(ENVS_FILE, 'utf8'));
-    
-    // 检查是否已存在
-    if (data.environments.find(env => env.name === name)) {
-      throw new Error(`Environment '${name}' already exists`);
+  async handleEnvGetActive(args) {
+    if (!this.activeEnvironment) {
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            active: null,
+            message: "No active environment set. Please use 'ats api-test --wizard' to configure environments."
+          }, null, 2)
+        }]
+      };
     }
     
-    const env = {
-      id: uuidv4(),
-      name,
-      baseUrl,
-      swaggerUrl: swaggerUrl || '/v3/api-docs',
-      authConfig,
-      database,
-      createdAt: new Date().toISOString()
+    // 构建环境信息，包含测试用户信息供Claude使用
+    const envInfo = {
+      active: this.activeEnvironment.name,
+      baseUrl: this.activeEnvironment.baseUrl,
+      swaggerUrl: this.activeEnvironment.swaggerUrl,
+      hasAuth: !!this.activeEnvironment.authConfig,
+      hasDatabase: !!this.activeEnvironment.database,
+      authType: this.activeEnvironment.authConfig?.type,
+      authenticated: !!this.authToken
     };
-    
-    data.environments.push(env);
-    
-    // 如果是第一个环境，设为活动环境
-    if (data.environments.length === 1) {
-      data.active = name;
-      this.activeEnvironment = env;
-    }
-    
-    await fs.writeFile(ENVS_FILE, JSON.stringify(data, null, 2));
-    
-    return {
-      content: [{
-        type: "text",
-        text: `Environment '${name}' created successfully\n${JSON.stringify(env, null, 2)}`
-      }]
-    };
-  }
 
-  async handleEnvList(args) {
-    const data = JSON.parse(await fs.readFile(ENVS_FILE, 'utf8'));
-    
-    return {
-      content: [{
-        type: "text",
-        text: JSON.stringify({
-          active: data.active,
-          environments: data.environments.map(env => ({
-            name: env.name,
-            baseUrl: env.baseUrl,
-            createdAt: env.createdAt
-          }))
-        }, null, 2)
-      }]
-    };
-  }
+    // 添加认证配置信息供Claude自动登录使用
+    if (this.activeEnvironment.authConfig) {
+      envInfo.authConfig = {
+        type: this.activeEnvironment.authConfig.type,
+        loginEndpoint: this.activeEnvironment.authConfig.loginEndpoint,
+        username: this.activeEnvironment.authConfig.username,
+        password: this.activeEnvironment.authConfig.password, // 包含密码供测试使用
+        tokenField: this.activeEnvironment.authConfig.tokenField,
+        headerName: this.activeEnvironment.authConfig.headerName,
+        headerPrefix: this.activeEnvironment.authConfig.headerPrefix
+      };
+    }
 
-  async handleEnvGet(args) {
-    const { name } = args;
-    const data = JSON.parse(await fs.readFile(ENVS_FILE, 'utf8'));
-    
-    const env = data.environments.find(e => e.name === name);
-    if (!env) {
-      throw new Error(`Environment '${name}' not found`);
+    // 添加数据库配置信息供数据操作使用
+    if (this.activeEnvironment.database) {
+      envInfo.database = {
+        type: this.activeEnvironment.database.type,
+        host: this.activeEnvironment.database.host,
+        port: this.activeEnvironment.database.port,
+        database: this.activeEnvironment.database.database,
+        user: this.activeEnvironment.database.user,
+        password: this.activeEnvironment.database.password // 包含密码供测试使用
+      };
     }
-    
-    return {
-      content: [{
-        type: "text",
-        text: JSON.stringify(env, null, 2)
-      }]
-    };
-  }
 
-  async handleEnvSetActive(args) {
-    const { name } = args;
-    const data = JSON.parse(await fs.readFile(ENVS_FILE, 'utf8'));
-    
-    const env = data.environments.find(e => e.name === name);
-    if (!env) {
-      throw new Error(`Environment '${name}' not found`);
-    }
-    
-    data.active = name;
-    this.activeEnvironment = env;
-    this.authToken = null; // 清空认证token
-    
-    await fs.writeFile(ENVS_FILE, JSON.stringify(data, null, 2));
-    
     return {
       content: [{
         type: "text",
-        text: `Active environment set to '${name}'\nBase URL: ${env.baseUrl}\nSwagger URL: ${env.baseUrl}${env.swaggerUrl}`
-      }]
-    };
-  }
-
-  async handleEnvDelete(args) {
-    const { name } = args;
-    const data = JSON.parse(await fs.readFile(ENVS_FILE, 'utf8'));
-    
-    const index = data.environments.findIndex(e => e.name === name);
-    if (index === -1) {
-      throw new Error(`Environment '${name}' not found`);
-    }
-    
-    data.environments.splice(index, 1);
-    
-    // 如果删除的是活动环境，清空活动环境
-    if (data.active === name) {
-      data.active = null;
-      this.activeEnvironment = null;
-      this.authToken = null;
-    }
-    
-    await fs.writeFile(ENVS_FILE, JSON.stringify(data, null, 2));
-    
-    return {
-      content: [{
-        type: "text",
-        text: `Environment '${name}' deleted successfully`
+        text: JSON.stringify(envInfo, null, 2)
       }]
     };
   }
@@ -1457,59 +1254,6 @@ class ApiTestMCPServer {
 
   // === 认证管理实现 ===
   
-  async handleAuthLogin(args) {
-    const { username, password } = args;
-    
-    if (!this.activeEnvironment) {
-      throw new Error('No active environment set');
-    }
-    
-    const authConfig = this.activeEnvironment.authConfig;
-    if (!authConfig) {
-      throw new Error('No auth configuration in active environment');
-    }
-    
-    const loginUrl = this.activeEnvironment.baseUrl + authConfig.loginEndpoint;
-    const loginData = {
-      username: username || authConfig.username,
-      password: password || authConfig.password
-    };
-    
-    try {
-      const response = await axios.post(loginUrl, loginData, {
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      // 提取token
-      let token = response.data;
-      if (authConfig.tokenField) {
-        const fields = authConfig.tokenField.split('.');
-        for (const field of fields) {
-          token = token[field];
-        }
-      }
-      
-      this.authToken = token;
-      
-      return {
-        content: [{
-          type: "text",
-          text: JSON.stringify({
-            success: true,
-            token: token,
-            tokenType: authConfig.type,
-            message: 'Login successful'
-          }, null, 2)
-        }]
-      };
-    } catch (error) {
-      throw new Error(`Login failed: ${error.message}`);
-    }
-  }
-
   async handleAuthValidate(args) {
     if (!this.authToken) {
       return {
@@ -1542,7 +1286,44 @@ class ApiTestMCPServer {
         type: "text",
         text: JSON.stringify({
           token: this.authToken,
-          hasToken: !!this.authToken
+          hasToken: !!this.authToken,
+          tokenType: this.activeEnvironment?.authConfig?.type || 'unknown'
+        }, null, 2)
+      }]
+    };
+  }
+
+  async handleAuthSetToken(args) {
+    const { token, tokenType } = args;
+    
+    if (!token) {
+      throw new Error('Token is required');
+    }
+    
+    // 验证token格式（基本验证）
+    if (typeof token !== 'string' || token.trim().length === 0) {
+      throw new Error('Token must be a non-empty string');
+    }
+    
+    // 如果提供了tokenType，验证是否与环境配置匹配
+    if (tokenType && this.activeEnvironment?.authConfig?.type) {
+      const envTokenType = this.activeEnvironment.authConfig.type;
+      if (tokenType !== envTokenType && tokenType !== 'bearer') {
+        console.warn(`Warning: Provided token type '${tokenType}' doesn't match environment config '${envTokenType}'`);
+      }
+    }
+    
+    this.authToken = token.trim();
+    
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({
+          success: true,
+          message: 'Authentication token set successfully',
+          tokenType: tokenType || this.activeEnvironment?.authConfig?.type || 'bearer',
+          tokenLength: this.authToken.length,
+          tokenPreview: this.authToken.substring(0, 20) + '...'
         }, null, 2)
       }]
     };
