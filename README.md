@@ -8,18 +8,49 @@
 
 ## ⚡ 快速开始
 
+### 方式一：全局安装（推荐）
 ```bash
-# 全局安装
+# 从npm安装
 npm install -g @kingfishers/awesome_tools
 
-# 查看帮助
-ats --help
-awesome-tools --help
+# 验证安装
+ats --version
+awesome-tools --version
+```
 
-# 🔥 热门功能快速体验
+### 方式二：本地开发安装
+```bash
+# 1. 克隆项目到本地
+git clone https://github.com/jinny76/awesome_tools.git
+cd awesome_tools
+
+# 2. 安装所有依赖（包括子项目）
+npm install                    # 主项目依赖
+cd mcp && npm install && cd .. # MCP服务器依赖  
+cd mcp-test && npm install && cd .. # API测试MCP依赖
+
+# 3. 全局链接（重要！）
+npm link
+
+# 4. 验证安装成功
+ats --help
+```
+
+### 一键安装脚本
+```bash
+# Windows
+install.bat
+
+# Linux/Mac  
+chmod +x install.sh && ./install.sh
+```
+
+### 🔥 快速体验
+```bash
 ats bt --wizard      # 浏览器工具一键安装
 ats gs --since "1 month ago"  # Git统计分析
 ats cc -d ./vue-project --dry-run  # Vue死代码检测
+ats api-test --wizard # API测试环境配置
 ```
 
 ## 🎯 核心功能
@@ -98,19 +129,68 @@ ats bt --extension
 
 ## 🔧 本地开发
 
+### 完整安装流程
 ```bash
-# 克隆仓库
+# 1. 克隆仓库
 git clone https://github.com/jinny76/awesome_tools.git
 cd awesome_tools
 
-# 安装依赖
+# 2. 安装主项目依赖
 npm install
 
-# 链接到全局
+# 3. 安装MCP服务器依赖
+cd mcp
+npm install
+cd ..
+
+# 4. 安装API测试MCP依赖
+cd mcp-test
+npm install
+cd ..
+
+# 5. 全局链接（让ats命令全局可用）
 npm link
 
-# 运行命令
+# 6. 验证安装成功
 ats --help
+```
+
+### 常见问题解决
+
+**1. 缺少依赖错误：**
+```bash
+# 如果遇到 "Cannot find module 'commander'" 错误
+npm install
+
+# 如果遇到 MCP 相关错误
+cd mcp && npm install
+cd mcp-test && npm install
+```
+
+**2. 权限问题（Windows）：**
+```bash
+# 以管理员身份运行 PowerShell 或 CMD
+npm link
+```
+
+**3. 使用一键脚本：**
+```bash
+# Windows（推荐）
+install.bat
+
+# Linux/Mac
+chmod +x install.sh
+./install.sh
+```
+
+### 开发调试
+```bash
+# 直接运行（不需要全局安装）
+node bin/cli.js --help
+
+# 测试特定命令
+node bin/cli.js gs --help
+node bin/cli.js api-test --wizard
 ```
 
 ## 📄 许可证
