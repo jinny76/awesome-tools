@@ -13,6 +13,7 @@
 - **动画分析**: 检测动画组和时间轴配置
 - **组件分析**: 识别Diagram3d、Space3d等翠鸟组件
 - **样条分析**: 分析样条曲线和路径数据
+- **全局数据获取**: 自动调用 `window.Kf.fetchGlobalData()` 获取全局对象数据
 
 ### 2. 实时查询
 支持基于条件的对象查询:
@@ -42,6 +43,12 @@ inspector.query({
     autoRotate: false
   }
 });
+
+// 获取全局数据 (翠鸟特有)
+inspector.performInspection(['global']);
+
+// 完整场景分析（包含全局数据）
+inspector.performInspection(['all']);
 ```
 
 ### 3. 性能优化
@@ -337,6 +344,16 @@ if (window.KingfisherSDK) {
     memoryUsage: 67108864
   },
   
+  global: {
+    timestamp: 1640995200000,
+    hasKfAPI: true,
+    data: {
+      // window.Kf.fetchGlobalData() 的返回结果
+      // 具体内容取决于实现
+    },
+    error: null
+  },
+  
   suggestions: [
     {
       type: "performance",
@@ -465,6 +482,86 @@ ats as -p 8080 -v
 
 检查器就会自动工作，无需额外配置！
 
+## 全局数据获取功能 (v2.1.1+)
+
+### 功能概述
+翠鸟场景检查器现在支持自动调用 `window.Kf.fetchGlobalData()` 方法来获取全局对象数据，为场景分析提供更丰富的上下文信息。
+
+### 使用方法
+
+#### 基本用法
+```javascript
+// 只获取全局数据
+const result = inspector.performInspection(['global']);
+const globalData = result.components.global;
+
+// 完整分析（包含全局数据）
+const fullAnalysis = inspector.performInspection(['all']);
+const globalData = fullAnalysis.components.global;
+```
+
+#### 通过MCP服务器调用
+```javascript
+// 在自定义脚本中获取全局数据
+const script = `
+  const inspection = inspector.performInspection(['global']);
+  return inspection.components.global;
+`;
+
+// 通过animation-server的脚本执行端点
+fetch('http://localhost:8081/api/script/execute', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ script })
+});
+```
+
+### 返回数据结构
+```javascript
+{
+  timestamp: 1640995200000,    // 获取时间戳
+  hasKfAPI: true,             // 是否找到 window.Kf.fetchGlobalData 方法
+  data: {                     // fetchGlobalData() 的返回结果
+    // 具体内容取决于 Kf.fetchGlobalData() 的实现
+    // 可能包含用户数据、配置信息、状态数据等
+  },
+  error: null                 // 错误信息（如果有）
+}
+```
+
+### 错误处理
+当 `window.Kf.fetchGlobalData()` 方法不存在或调用失败时：
+```javascript
+{
+  timestamp: 1640995200000,
+  hasKfAPI: false,
+  data: null,
+  error: "window.Kf.fetchGlobalData 方法不可用"
+}
+```
+
+### 安全特性
+- **API检测**: 自动检测方法是否存在，避免调用未定义函数
+- **错误捕获**: 完整的try-catch包装，确保不会中断场景分析
+- **数据序列化**: 自动处理复杂对象和循环引用问题
+- **详细日志**: 提供完整的调用过程日志便于调试
+
+### 与场景分析的集成
+全局数据可以与其他分析组件组合使用：
+```javascript
+// 获取性能数据和全局数据
+const result = inspector.performInspection(['performance', 'global']);
+
+// 获取基础信息、节点信息和全局数据
+const result = inspector.performInspection(['basic', 'nodes', 'global']);
+```
+
+### 实际应用场景
+- **用户上下文**: 获取当前登录用户信息
+- **配置数据**: 获取应用配置和设置
+- **业务数据**: 获取与场景相关的业务逻辑数据
+- **状态同步**: 获取应用全局状态信息
+
 ## 技术要求
 
 - 翠鸟3D引擎 (Kingfisher Engine)
@@ -472,6 +569,7 @@ ats as -p 8080 -v
 - 翠鸟UI组件 (KingfisherUI) - 可选  
 - WebSocket支持 (动画服务器通信)
 - 现代浏览器 (ES6+支持)
+- `window.Kf.fetchGlobalData()` 方法实现 - 可选（用于全局数据获取）
 
 ## 结语
 

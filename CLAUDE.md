@@ -152,6 +152,7 @@ ats rs redis                 # Connect to Redis service
 - **KPath查询**: 使用翠鸟的KPath系统进行精确的节点查询
 - **SDK集成**: 充分利用翠鸟云SDK和UI组件API
 - **远程优化**: 接收并执行服务器下发的优化命令
+- **全局数据获取**: 支持调用 `window.Kf.fetchGlobalData()` 获取全局对象数据
 
 **一行代码启动:**
 ```javascript
@@ -164,6 +165,7 @@ const inspector = new KingfisherSceneInspector();
 - 机位切换: `inspector.optimize('focus_camera', { target: 'building1' })`
 - 对象隐藏: `inspector.optimize('hide_objects', { objects: ['obj1', 'obj2'] })`
 - 自定义脚本: `inspector.executeScript('return scene.meshes.length')`
+- 全局数据获取: `inspector.performInspection(['global'])` 或 `inspector.performInspection(['all'])`
 
 **自定义脚本执行 (v2.1.0+):**
 - **安全沙盒**: 脚本在受控环境中执行，支持场景分析和数据处理
@@ -177,6 +179,30 @@ const inspector = new KingfisherSceneInspector();
   const nodes = context.inspector.getAllNodes();
   const visible = nodes.filter(n => n.isVisible !== false).length;
   return { total: nodes.length, visible: visible };
+  ```
+
+**全局数据获取 (v2.1.1+):**
+- **API集成**: 自动检测并调用 `window.Kf.fetchGlobalData()` 方法
+- **安全调用**: 包含完整的错误处理和API可用性检查
+- **数据序列化**: 自动处理复杂对象和循环引用问题
+- **详细日志**: 提供完整的调用过程日志便于调试
+- **返回格式**:
+  ```javascript
+  {
+    timestamp: 1640995200000,
+    hasKfAPI: true,
+    data: { /* fetchGlobalData的返回结果 */ },
+    error: null
+  }
+  ```
+- **使用方式**:
+  ```javascript
+  // 获取全局数据
+  const result = inspector.performInspection(['global']);
+  const globalData = result.components.global;
+  
+  // 完整场景分析（包含全局数据）
+  const fullAnalysis = inspector.performInspection(['all']);
   ```
 
 ## Key Features
