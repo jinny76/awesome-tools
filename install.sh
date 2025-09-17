@@ -17,6 +17,11 @@ echo "📦 安装 MCP 测试服务器依赖..."
 cd ../mcp-test
 npm install
 
+echo 📦 安装 MCP 测试服务器依赖...
+cd ../mcp_3d
+call npm install
+if errorlevel 1 goto :error
+
 # 返回根目录并全局链接
 echo "🔗 创建全局链接..."
 cd ..

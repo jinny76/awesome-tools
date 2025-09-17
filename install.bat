@@ -15,6 +15,11 @@ cd ..\mcp-test
 call npm install
 if errorlevel 1 goto :error
 
+echo 📦 安装 MCP 3D服务器依赖...
+cd ..\mcp_3d
+call npm install
+if errorlevel 1 goto :error
+
 echo 🔗 创建全局链接...
 cd ..
 call npm link

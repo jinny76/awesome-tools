@@ -1,0 +1,24 @@
+{
+  "name": "awesome-tools-mcp-3d",
+  "version": "1.0.0",
+  "description": "MCP 3D场景管理服务器 - 支持场景列表、心跳监控、场景切换、清理、分析和脚本执行",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.1"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "mcp",
+    "3d",
+    "scene",
+    "management",
+    "kingfisher"
+  ],
+  "author": "",
+  "license": "MIT"
+}
