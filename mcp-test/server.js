@@ -604,6 +604,98 @@ class ApiTestMCPServer {
             }
           },
           
+          // === 日志查询 ===
+          {
+            name: "log_list",
+            description: "获取系统中所有可用的日志文件信息",
+            inputSchema: {
+              type: "object",
+              properties: {}
+            }
+          },
+          {
+            name: "log_query",
+            description: "根据条件搜索日志内容，支持分页、关键词搜索、日志级别过滤、时间范围过滤等",
+            inputSchema: {
+              type: "object",
+              properties: {
+                fileName: {
+                  type: "string",
+                  description: "要查询的日志文件名",
+                  default: "app.log"
+                },
+                keyword: {
+                  type: "string",
+                  description: "搜索关键词"
+                },
+                level: {
+                  type: "string",
+                  description: "日志级别（如：ERROR, WARN, INFO, DEBUG）"
+                },
+                startTime: {
+                  type: "string",
+                  description: "开始时间（ISO格式：2024-01-18T10:00:00）"
+                },
+                endTime: {
+                  type: "string",
+                  description: "结束时间（ISO格式：2024-01-18T12:00:00）"
+                },
+                page: {
+                  type: "integer",
+                  description: "页码",
+                  default: 1
+                },
+                size: {
+                  type: "integer",
+                  description: "每页大小",
+                  default: 100
+                },
+                regex: {
+                  type: "boolean",
+                  description: "是否使用正则表达式搜索",
+                  default: false
+                }
+              }
+            }
+          },
+          {
+            name: "log_tail",
+            description: "获取日志文件的最后N行，类似于Linux的tail命令",
+            inputSchema: {
+              type: "object",
+              properties: {
+                fileName: {
+                  type: "string",
+                  description: "日志文件名",
+                  default: "app.log"
+                },
+                lines: {
+                  type: "integer",
+                  description: "获取的行数",
+                  default: 100
+                }
+              }
+            }
+          },
+          {
+            name: "log_download",
+            description: "下载指定的日志文件",
+            inputSchema: {
+              type: "object",
+              properties: {
+                fileName: {
+                  type: "string",
+                  description: "要下载的日志文件名"
+                },
+                saveToFile: {
+                  type: "string",
+                  description: "保存到本地文件路径（可选，如果指定则保存到文件，否则返回内容）"
+                }
+              },
+              required: ["fileName"]
+            }
+          },
+          
           // === 工具函数 ===
           {
             name: "parse_application_yml",
@@ -697,6 +789,16 @@ class ApiTestMCPServer {
           case "db_execute_query":
             return await this.handleExecuteQuery(args);
           
+          // 日志查询
+          case "log_list":
+            return await this.handleLogList(args);
+          case "log_query":
+            return await this.handleLogQuery(args);
+          case "log_tail":
+            return await this.handleLogTail(args);
+          case "log_download":
+            return await this.handleLogDownload(args);
+          
           // 工具函数
           case "parse_application_yml":
             return await this.handleParseApplicationYml(args);
@@ -738,8 +840,10 @@ class ApiTestMCPServer {
       active: this.activeEnvironment.name,
       baseUrl: this.activeEnvironment.baseUrl,
       swaggerUrl: this.activeEnvironment.swaggerUrl,
+      logServerUrl: this.getLogServerBaseUrl(),
       hasAuth: !!this.activeEnvironment.authConfig,
       hasDatabase: !!this.activeEnvironment.database,
+      hasLogServer: !!this.activeEnvironment.logServerUrl,
       authType: this.activeEnvironment.authConfig?.type,
       authenticated: !!this.authToken
     };
@@ -2143,6 +2247,237 @@ class ApiTestMCPServer {
       if (connection) {
         await this.closeDatabaseConnection(connection, db.type);
       }
+    }
+  }
+
+  // === 日志查询实现 ===
+  
+  /**
+   * 获取日志服务器的基础URL
+   */
+  getLogServerBaseUrl() {
+    // 从环境配置中获取日志服务器URL
+    if (this.activeEnvironment?.logServerUrl) {
+      return this.activeEnvironment.logServerUrl;
+    }
+    
+    // 如果环境配置中没有，使用baseUrl + 默认日志路径
+    if (this.activeEnvironment?.baseUrl) {
+      return this.activeEnvironment.baseUrl.replace(/\/api\/?$/, '');
+    }
+    
+    // 最后的默认值
+    return 'http://localhost:38181';
+  }
+
+  /**
+   * 处理获取日志文件列表
+   */
+  async handleLogList(args) {
+    const logServerUrl = this.getLogServerBaseUrl();
+    
+    try {
+      const response = await axios.get(`${logServerUrl}/api/logs/list`, {
+        timeout: 10000
+      });
+      
+      // 格式化输出日志文件列表
+      let output = `日志文件列表 (服务器: ${logServerUrl}):\n`;
+      output += '='.repeat(60) + '\n';
+      
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        response.data.forEach((file, index) => {
+          output += `${index + 1}. ${file.fileName}\n`;
+          output += `   大小: ${(file.size / 1024).toFixed(1)} KB\n`;
+          output += `   修改时间: ${file.lastModified}\n`;
+          output += `   路径: ${file.path}\n`;
+          output += `   压缩: ${file.compressed ? '是' : '否'}\n\n`;
+        });
+      } else {
+        output += '未找到任何日志文件。\n';
+      }
+      
+      return {
+        content: [{
+          type: "text",
+          text: output
+        }]
+      };
+    } catch (error) {
+      const errorMsg = error.response?.status === 404 
+        ? `日志服务器不可用 (${logServerUrl}). 请检查服务器是否启动或环境配置中的logServerUrl是否正确。`
+        : `获取日志文件列表失败: ${error.message}`;
+      throw new Error(errorMsg);
+    }
+  }
+
+  /**
+   * 处理日志查询
+   */
+  async handleLogQuery(args) {
+    const { 
+      fileName = 'app.log', 
+      keyword, 
+      level, 
+      startTime, 
+      endTime, 
+      page = 1, 
+      size = 100, 
+      regex = false
+    } = args;
+    
+    const logServerUrl = this.getLogServerBaseUrl();
+    
+    // 构建查询参数
+    const queryParams = {
+      fileName,
+      page,
+      size,
+      regex
+    };
+    
+    if (keyword) queryParams.keyword = keyword;
+    if (level) queryParams.level = level;
+    if (startTime) queryParams.startTime = startTime;
+    if (endTime) queryParams.endTime = endTime;
+    
+    try {
+      const response = await axios.post(`${logServerUrl}/api/logs/query`, queryParams, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000
+      });
+      
+      // 格式化输出，提供更好的可读性
+      const data = response.data;
+      let output = `日志查询结果：\n`;
+      output += `文件: ${fileName}\n`;
+      output += `总计: ${data.total} 条日志\n`;
+      output += `页码: ${data.page}/${Math.ceil(data.total / data.size)}\n`;
+      output += `每页: ${data.size} 条\n`;
+      output += `更多: ${data.hasMore ? '是' : '否'}\n\n`;
+      
+      if (data.logs && data.logs.length > 0) {
+        output += '--- 日志内容 ---\n';
+        data.logs.forEach((log, index) => {
+          output += `${index + 1}. [${log.timestamp}] [${log.level}] ${log.message}\n`;
+          if (log.thread) output += `   线程: ${log.thread}\n`;
+          if (log.logger) output += `   记录器: ${log.logger}\n`;
+          if (log.lineNumber) output += `   行号: ${log.lineNumber}\n`;
+          output += '\n';
+        });
+      } else {
+        output += '未找到匹配的日志记录。\n';
+      }
+      
+      return {
+        content: [{
+          type: "text",
+          text: output
+        }]
+      };
+    } catch (error) {
+      const errorMsg = error.response?.status === 404 
+        ? `日志服务器不可用 (${logServerUrl}). 请检查服务器是否启动或环境配置是否正确。`
+        : `日志查询失败: ${error.message}`;
+      throw new Error(errorMsg);
+    }
+  }
+
+  /**
+   * 处理日志tail操作
+   */
+  async handleLogTail(args) {
+    const { fileName = 'app.log', lines = 100 } = args;
+    const logServerUrl = this.getLogServerBaseUrl();
+    
+    try {
+      const response = await axios.get(`${logServerUrl}/api/logs/tail`, {
+        params: {
+          fileName,
+          lines
+        },
+        timeout: 10000
+      });
+      
+      let output = `最新 ${lines} 行日志 - ${fileName}:\n`;
+      output += '='.repeat(60) + '\n';
+      
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        response.data.forEach((line, index) => {
+          output += `${(index + 1).toString().padStart(4, ' ')} | ${line}\n`;
+        });
+      } else {
+        output += '日志文件为空或不存在。\n';
+      }
+      
+      return {
+        content: [{
+          type: "text",
+          text: output
+        }]
+      };
+    } catch (error) {
+      const errorMsg = error.response?.status === 404 
+        ? `日志服务器不可用或日志文件不存在 (${logServerUrl}/${fileName}). 请检查服务器状态和文件名。`
+        : `获取日志尾部失败: ${error.message}`;
+      throw new Error(errorMsg);
+    }
+  }
+
+  /**
+   * 处理日志下载
+   */
+  async handleLogDownload(args) {
+    const { fileName, saveToFile } = args;
+    const logServerUrl = this.getLogServerBaseUrl();
+    
+    try {
+      const response = await axios.get(`${logServerUrl}/api/logs/download/${fileName}`, {
+        responseType: 'arraybuffer',
+        timeout: 60000
+      });
+      
+      if (saveToFile) {
+        // 保存到文件
+        await fs.writeFile(saveToFile, response.data);
+        
+        return {
+          content: [{
+            type: "text",
+            text: `日志文件 '${fileName}' 已下载到: ${saveToFile}\n文件大小: ${response.data.length} 字节`
+          }]
+        };
+      } else {
+        // 返回内容（注意：二进制文件可能不适合直接显示）
+        const isTextFile = fileName.endsWith('.log') || fileName.endsWith('.txt');
+        
+        if (isTextFile && response.data.length < 50000) {
+          // 如果是文本日志文件且不太大，直接返回内容
+          const content = Buffer.from(response.data).toString('utf8');
+          
+          return {
+            content: [{
+              type: "text",
+              text: `日志文件内容 - ${fileName}:\n${'='.repeat(60)}\n${content}`
+            }]
+          };
+        } else {
+          // 文件太大或是二进制文件，只返回基本信息
+          return {
+            content: [{
+              type: "text",
+              text: `日志文件 '${fileName}' 下载完成\n文件大小: ${response.data.length} 字节\n类型: ${isTextFile ? '文本文件' : '二进制文件'}\n\n提示: 文件较大，建议使用 saveToFile 参数保存到本地文件。`
+            }]
+          };
+        }
+      }
+    } catch (error) {
+      const errorMsg = error.response?.status === 404 
+        ? `日志文件不存在 (${fileName}) 或服务器不可用 (${logServerUrl}). 请检查文件名和服务器状态。`
+        : `下载日志文件失败: ${error.message}`;
+      throw new Error(errorMsg);
     }
   }
 
