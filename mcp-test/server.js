@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// UTF-8 support for Windows console
+// Note: MCP uses stdio transport, encoding handled by MCP SDK
+
 /**
  * API Test MCP Server
  * 专门用于API自动化测试的MCP服务器
@@ -19,7 +22,6 @@ import yaml from 'yaml';
 import { v4 as uuidv4 } from 'uuid';
 import mysql from 'mysql2/promise';
 import pg from 'pg';
-import { createWriteStream } from 'fs';
 
 // 获取当前文件的目录路径
 const __filename = fileURLToPath(import.meta.url);
@@ -40,7 +42,6 @@ const ENVS_FILE = join(DATA_DIR, 'environments.json');
 const SUITES_DIR = join(DATA_DIR, 'suites');
 const RESULTS_DIR = join(DATA_DIR, 'results');
 const SNAPSHOTS_DIR = join(DATA_DIR, 'snapshots');
-const LOGS_DIR = join(DATA_DIR, 'logs');
 
 /**
  * API Test MCP Server
@@ -62,101 +63,12 @@ class ApiTestMCPServer {
     this.activeEnvironment = null;
     this.authToken = null;
     this.testContext = new Map(); // 存储测试上下文数据
-    this.enableDebugLog = process.env.MCP_DEBUG === 'true' || process.argv.includes('--debug');
-    this.enableFileLog = process.env.MCP_FILE_LOG === 'true' || process.argv.includes('--file-log');
-    this.logStream = null;
 
     this.setupToolHandlers();
     this.initializeDataDirectories();
     this.loadActiveEnvironment();
   }
 
-  /**
-   * 初始化日志文件流
-   */
-  async initializeLogStream() {
-    if (this.enableFileLog) {
-      try {
-        await fs.mkdir(LOGS_DIR, { recursive: true });
-        const logFileName = `mcp-${new Date().toISOString().split('T')[0]}.log`;
-        const logFilePath = join(LOGS_DIR, logFileName);
-        this.logStream = createWriteStream(logFilePath, { flags: 'a' });
-        this.writeLog('INFO', 'Log file initialized', { logFile: logFilePath });
-      } catch (error) {
-        console.error('Failed to initialize log file:', error.message);
-        this.enableFileLog = false;
-      }
-    }
-  }
-
-  /**
-   * 写入日志（同时输出到控制台和文件）
-   */
-  writeLog(level, message, data = null, error = null) {
-    const timestamp = new Date().toISOString();
-    const logEntry = {
-      timestamp,
-      level,
-      message,
-      data,
-      error: error ? {
-        message: error.message,
-        status: error.response?.status,
-        responseData: error.response?.data,
-        stack: this.enableDebugLog ? error.stack : undefined
-      } : undefined
-    };
-
-    // 控制台输出
-    console.error(`[${timestamp}] [MCP-${level}] ${message}`);
-    if (data && (this.enableDebugLog || level === 'ERROR')) {
-      console.error(`[${timestamp}] [MCP-${level}] Data:`, JSON.stringify(data, null, 2));
-    }
-    if (error) {
-      if (error.response) {
-        console.error(`[${timestamp}] [MCP-${level}] HTTP Status: ${error.response.status}`);
-        console.error(`[${timestamp}] [MCP-${level}] Response Data:`, error.response.data);
-      }
-      console.error(`[${timestamp}] [MCP-${level}] Error Details:`, error.message);
-      if (error.stack && this.enableDebugLog) {
-        console.error(`[${timestamp}] [MCP-${level}] Stack Trace:`, error.stack);
-      }
-    }
-
-    // 异步文件输出，避免阻塞主流程
-    if (this.enableFileLog && this.logStream) {
-      setImmediate(() => {
-        try {
-          this.logStream.write(JSON.stringify(logEntry) + '\n');
-        } catch (writeError) {
-          console.error('Failed to write to log file:', writeError.message);
-        }
-      });
-    }
-  }
-
-  /**
-   * 调试日志输出
-   */
-  debugLog(message, data = null) {
-    if (this.enableDebugLog) {
-      this.writeLog('DEBUG', message, data);
-    }
-  }
-
-  /**
-   * 错误日志输出
-   */
-  errorLog(message, error = null) {
-    this.writeLog('ERROR', message, null, error);
-  }
-
-  /**
-   * 信息日志输出
-   */
-  infoLog(message, data = null) {
-    this.writeLog('INFO', message, data);
-  }
 
   /**
    * 初始化数据目录
@@ -171,7 +83,6 @@ class ApiTestMCPServer {
       await fs.mkdir(SUITES_DIR, { recursive: true });
       await fs.mkdir(RESULTS_DIR, { recursive: true });
       await fs.mkdir(SNAPSHOTS_DIR, { recursive: true });
-      await fs.mkdir(LOGS_DIR, { recursive: true });
 
       // 初始化环境配置文件
       try {
@@ -845,6 +756,8 @@ class ApiTestMCPServer {
     // 注册工具调用处理器
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
+      console.error(`[DEBUG] 收到工具调用请求: ${name}`);
+      console.error(`[DEBUG] 工具参数:`, JSON.stringify(args));
 
       try {
         switch (name) {
@@ -2403,16 +2316,17 @@ class ApiTestMCPServer {
    * 带重试机制的HTTP请求
    */
   async fetchWithRetry(url, config, maxRetries = 3, context = '') {
+    console.error(`[DEBUG] fetchWithRetry 开始: ${context} - ${url}`);
     let lastError = null;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        this.debugLog(`${context ? `[${context}] ` : ''}尝试请求 (${attempt}/${maxRetries}): ${url}`, config);
+        console.error(`[DEBUG] ${context} 尝试请求 ${attempt}/${maxRetries}`);
 
         const response = await axios.get(url, config);
+        console.error(`[DEBUG] ${context} 请求成功，状态: ${response.status}`);
 
         if (attempt > 1) {
-          this.infoLog(`${context ? `[${context}] ` : ''}重试成功，第 ${attempt} 次尝试`);
         }
 
         return response;
@@ -2423,16 +2337,9 @@ class ApiTestMCPServer {
                               error.code === 'ETIMEDOUT' ||
                               error.message.includes('timeout');
 
-        this.debugLog(`${context ? `[${context}] ` : ''}请求失败 (${attempt}/${maxRetries})`, {
-          error: error.message,
-          code: error.code,
-          isNetworkError
-        });
-
         if (attempt < maxRetries && isNetworkError) {
           // 指数退避：第一次重试等待1秒，第二次等待2秒
           const delayMs = attempt * 1000;
-          this.infoLog(`${context ? `[${context}] ` : ''}网络错误，${delayMs}ms 后重试...`);
           await this.delay(delayMs);
         } else if (attempt < maxRetries) {
           // 非网络错误，短暂延迟后重试
@@ -2449,12 +2356,8 @@ class ApiTestMCPServer {
    * 处理聊天记录查询
    */
   async handleChatGroupMessages(args) {
-    this.infoLog('开始处理聊天记录查询请求', args);
-
-    // 重置相关状态
-    if (this.logStream && this.logStream.pending) {
-      await new Promise(resolve => this.logStream.once('drain', resolve));
-    }
+    console.error('[DEBUG] 开始处理聊天记录查询请求');
+    console.error('[DEBUG] 接收到的参数:', JSON.stringify(args));
 
     const {
       groupKeyword,
@@ -2463,17 +2366,19 @@ class ApiTestMCPServer {
       messageKeyword,
       groupBy = 'group'
     } = args;
+    
+    console.error('[DEBUG] 解析后的groupKeyword:', groupKeyword);
 
     if (!groupKeyword) {
       const error = '群名关键词是必需的参数';
-      this.errorLog(error);
       throw new Error(error);
     }
 
     const chatServerUrl = this.getChatServerBaseUrl();
-    this.debugLog(`聊天服务器URL: ${chatServerUrl}`);
+    console.error('[DEBUG] 聊天服务器URL:', chatServerUrl);
 
     try {
+      console.error('[DEBUG] 开始处理时间参数');
       // 处理时间参数
       let timeParam = '';
 
@@ -2494,8 +2399,8 @@ class ApiTestMCPServer {
         timeParam = today;
       }
 
-      this.infoLog(`处理后的时间参数: ${timeParam}`);
-      this.debugLog('开始获取群聊列表', { groupKeyword, timeParam });
+      console.error('[DEBUG] 时间参数处理完成:', timeParam);
+      console.error('[DEBUG] 开始获取群聊列表');
 
       // 首先获取群聊列表，筛选出包含关键词的群
       const chatroomResponse = await this.fetchWithRetry(`${chatServerUrl}/api/v1/chatroom`, {
@@ -2509,21 +2414,7 @@ class ApiTestMCPServer {
         }
       }, 3, '群聊列表');
 
-      // 获取群组列表后添加延迟，避免立即查询聊天记录导致连接问题
-      this.debugLog('群组列表获取完成，等待1000ms后继续处理...');
-      await this.delay(1000);
-
-      // 强制垃圾回收以释放内存
-      if (global.gc) {
-        global.gc();
-      }
-
-      this.debugLog('群聊列表API响应', {
-        status: chatroomResponse.status,
-        dataType: typeof chatroomResponse.data,
-        hasItems: chatroomResponse.data?.items ? chatroomResponse.data.items.length : 0
-      });
-
+      console.error('[DEBUG] 群聊列表请求完成');
       const chatroomsData = chatroomResponse.data;
       const matchedGroups = [];
 
@@ -2549,11 +2440,8 @@ class ApiTestMCPServer {
         });
       }
 
-      this.infoLog(`筛选出 ${matchedGroups.length} 个匹配的群组`);
-      this.debugLog('匹配的群组列表', matchedGroups);
 
       if (matchedGroups.length === 0) {
-        this.infoLog(`未找到群名包含 "${groupKeyword}" 的群组`);
         return {
           content: [{
             type: "text",
@@ -2566,17 +2454,11 @@ class ApiTestMCPServer {
       const allMessages = [];
       let totalMessageCount = 0;
 
-      this.infoLog('开始查询各群组的聊天记录');
 
       for (let i = 0; i < matchedGroups.length; i++) {
         const group = matchedGroups[i];
-
-        // 在群组间添加延迟，避免请求过于频繁
-        if (i > 0) {
-          await this.delay(500); // 每个群组间隔500ms
-        }
+        
         try {
-          this.debugLog(`正在查询群组: ${group.name} (${group.id}) 的聊天记录`);
 
           // 构建查询参数
           const params = {
@@ -2585,7 +2467,6 @@ class ApiTestMCPServer {
             format: 'json'
           };
 
-          this.debugLog(`群组 ${group.name} 请求参数:`, params);
 
           // 添加重试机制 - 使用与浏览器完全一致的请求方式
           const messagesResponse = await this.fetchWithRetry(`${chatServerUrl}/api/v1/chatlog`, {
@@ -2607,22 +2488,13 @@ class ApiTestMCPServer {
           // 解析JSON响应
           let messages;
           try {
-            this.debugLog(`群组 ${group.name} 响应状态: ${messagesResponse.status}`);
-            this.debugLog(`群组 ${group.name} 原始响应类型: ${typeof messagesResponse.data}`);
-            this.debugLog(`群组 ${group.name} 原始响应长度: ${messagesResponse.data.length}`);
 
             messages = JSON.parse(messagesResponse.data);
-            this.debugLog(`群组 ${group.name} JSON解析成功，解析后类型: ${typeof messages}`);
-            this.debugLog(`群组 ${group.name} JSON解析后是否为数组: ${Array.isArray(messages)}`);
 
             if (Array.isArray(messages)) {
-              this.debugLog(`群组 ${group.name} 数组长度: ${messages.length}`);
             } else if (typeof messages === 'object') {
-              this.debugLog(`群组 ${group.name} 对象键数量: ${Object.keys(messages).length}`);
             }
           } catch (jsonError) {
-            this.errorLog(`群组 ${group.name} JSON解析失败`, jsonError);
-            this.debugLog(`群组 ${group.name} 原始响应内容: ${messagesResponse.data.substring(0, 1000)}`);
             continue;
           }
 
@@ -2630,22 +2502,18 @@ class ApiTestMCPServer {
           if (messages && typeof messages === 'object' && !Array.isArray(messages)) {
             const keys = Object.keys(messages);
             if (keys.length > 0 && keys.every(key => /^\d+$/.test(key))) {
-              this.debugLog(`群组 ${group.name} 检测到类数组对象，转换为数组`);
               messages = Object.values(messages);
             }
           }
 
-          this.debugLog(`群组 ${group.name} 原始消息数量: ${Array.isArray(messages) ? messages.length : 0}`);
 
           if (Array.isArray(messages) && messages.length > 0) {
-            this.debugLog(`开始处理群组 ${group.name} 的 ${messages.length} 条消息`);
             // 如果有消息关键词过滤
             const startFilterTime = Date.now();
             const filteredMessages = messageKeyword
               ? messages.filter((msg, index) => {
                   // 每100条消息输出一次进度日志
                   if (index > 0 && index % 100 === 0) {
-                    this.debugLog(`群组 ${group.name} 消息过滤进度: ${index}/${messages.length}`);
                   }
 
                   // 构建可搜索的文本内容
@@ -2711,15 +2579,9 @@ class ApiTestMCPServer {
                   }
 
                   // 检查是否包含关键词（不区分大小写）
-                  this.debugLog(`过滤聊天记录: ${searchableContent}`);
                   return searchableContent.toLowerCase().includes(messageKeyword.toLowerCase());
                 })
               : messages;
-
-            this.debugLog(`群组 ${group.name} 过滤后消息数量: ${filteredMessages.length}`, {
-              hasMessageKeyword: !!messageKeyword,
-              messageKeyword: messageKeyword
-            });
 
             if (filteredMessages.length > 0) {
               // 注意：API返回的talkerName可能就是群名
@@ -2732,17 +2594,13 @@ class ApiTestMCPServer {
               });
               totalMessageCount += filteredMessages.length;
 
-              this.infoLog(`群组 "${actualGroupName}" 添加了 ${filteredMessages.length} 条消息`);
             }
           } else {
-            this.debugLog(`群组 ${group.name} 没有消息数据`);
           }
         } catch (error) {
-          this.errorLog(`获取群组 ${group.name} 消息失败`, error);
         }
       }
 
-      this.infoLog(`消息查询完成，总计获得 ${totalMessageCount} 条消息，来自 ${allMessages.length} 个群组`);
 
       // 格式化输出
       let output = `聊天记录查询结果\n`;
@@ -2903,22 +2761,6 @@ class ApiTestMCPServer {
         });
       }
 
-      // 清理资源
-      this.debugLog('聊天记录查询完成，清理资源...');
-
-      // 等待所有异步日志写入完成
-      if (this.logStream && this.logStream.pending) {
-        await new Promise(resolve => {
-          this.logStream.once('drain', resolve);
-          // 添加超时防止永久等待
-          setTimeout(resolve, 1000);
-        });
-      }
-
-      // 强制垃圾回收
-      if (global.gc) {
-        global.gc();
-      }
 
       return {
         content: [{
@@ -2927,21 +2769,10 @@ class ApiTestMCPServer {
         }]
       };
     } catch (error) {
-      // 清理资源（错误情况下）
-      this.debugLog('聊天记录查询出错，清理资源...');
-      if (this.logStream && this.logStream.pending) {
-        await new Promise(resolve => {
-          this.logStream.once('drain', resolve);
-          setTimeout(resolve, 500);
-        });
-      }
-      if (global.gc) {
-        global.gc();
-      }
+      // 错误处理
 
       // 如果是404错误，说明API端点不正确
       if (error.response?.status === 404) {
-        this.errorLog('聊天服务器API端点未找到', error);
         return {
           content: [{
             type: "text",
@@ -2950,7 +2781,6 @@ class ApiTestMCPServer {
         };
       }
 
-      this.errorLog('查询聊天记录失败', error);
       const errorMsg = `查询聊天记录失败: ${error.message}`;
       throw new Error(errorMsg);
     }
@@ -3226,27 +3056,14 @@ class ApiTestMCPServer {
    * 启动服务器
    */
   async start() {
-    // 初始化日志文件流
-    await this.initializeLogStream();
-
+    console.error('[DEBUG] MCP服务器开始启动...');
     const transport = new StdioServerTransport();
+    console.error('[DEBUG] 正在连接StdioServerTransport...');
     await this.server.connect(transport);
-
-    this.infoLog('MCP服务器启动成功', {
-      debugEnabled: this.enableDebugLog,
-      fileLogEnabled: this.enableFileLog,
-      projectDir: projectDir,
-      dataDir: DATA_DIR,
-      logsDir: LOGS_DIR,
-      activeEnvironment: this.activeEnvironment?.name || 'none'
-    });
+    console.error('[DEBUG] MCP服务器连接完成');
 
     // 优雅关闭处理
     process.on('SIGINT', async () => {
-      this.infoLog('MCP服务器正在关闭...');
-      if (this.logStream) {
-        this.logStream.end();
-      }
       await this.server.close();
       process.exit(0);
     });
