@@ -19,6 +19,7 @@ import yaml from 'yaml';
 import { v4 as uuidv4 } from 'uuid';
 import mysql from 'mysql2/promise';
 import pg from 'pg';
+import { createWriteStream } from 'fs';
 
 // 获取当前文件的目录路径
 const __filename = fileURLToPath(import.meta.url);
@@ -39,6 +40,7 @@ const ENVS_FILE = join(DATA_DIR, 'environments.json');
 const SUITES_DIR = join(DATA_DIR, 'suites');
 const RESULTS_DIR = join(DATA_DIR, 'results');
 const SNAPSHOTS_DIR = join(DATA_DIR, 'snapshots');
+const LOGS_DIR = join(DATA_DIR, 'logs');
 
 /**
  * API Test MCP Server
@@ -60,10 +62,100 @@ class ApiTestMCPServer {
     this.activeEnvironment = null;
     this.authToken = null;
     this.testContext = new Map(); // 存储测试上下文数据
-    
+    this.enableDebugLog = process.env.MCP_DEBUG === 'true' || process.argv.includes('--debug');
+    this.enableFileLog = process.env.MCP_FILE_LOG === 'true' || process.argv.includes('--file-log');
+    this.logStream = null;
+
     this.setupToolHandlers();
     this.initializeDataDirectories();
     this.loadActiveEnvironment();
+  }
+
+  /**
+   * 初始化日志文件流
+   */
+  async initializeLogStream() {
+    if (this.enableFileLog) {
+      try {
+        await fs.mkdir(LOGS_DIR, { recursive: true });
+        const logFileName = `mcp-${new Date().toISOString().split('T')[0]}.log`;
+        const logFilePath = join(LOGS_DIR, logFileName);
+        this.logStream = createWriteStream(logFilePath, { flags: 'a' });
+        this.writeLog('INFO', 'Log file initialized', { logFile: logFilePath });
+      } catch (error) {
+        console.error('Failed to initialize log file:', error.message);
+        this.enableFileLog = false;
+      }
+    }
+  }
+
+  /**
+   * 写入日志（同时输出到控制台和文件）
+   */
+  writeLog(level, message, data = null, error = null) {
+    const timestamp = new Date().toISOString();
+    const logEntry = {
+      timestamp,
+      level,
+      message,
+      data,
+      error: error ? {
+        message: error.message,
+        status: error.response?.status,
+        responseData: error.response?.data,
+        stack: this.enableDebugLog ? error.stack : undefined
+      } : undefined
+    };
+
+    // 控制台输出
+    console.error(`[${timestamp}] [MCP-${level}] ${message}`);
+    if (data && (this.enableDebugLog || level === 'ERROR')) {
+      console.error(`[${timestamp}] [MCP-${level}] Data:`, JSON.stringify(data, null, 2));
+    }
+    if (error) {
+      if (error.response) {
+        console.error(`[${timestamp}] [MCP-${level}] HTTP Status: ${error.response.status}`);
+        console.error(`[${timestamp}] [MCP-${level}] Response Data:`, error.response.data);
+      }
+      console.error(`[${timestamp}] [MCP-${level}] Error Details:`, error.message);
+      if (error.stack && this.enableDebugLog) {
+        console.error(`[${timestamp}] [MCP-${level}] Stack Trace:`, error.stack);
+      }
+    }
+
+    // 异步文件输出，避免阻塞主流程
+    if (this.enableFileLog && this.logStream) {
+      setImmediate(() => {
+        try {
+          this.logStream.write(JSON.stringify(logEntry) + '\n');
+        } catch (writeError) {
+          console.error('Failed to write to log file:', writeError.message);
+        }
+      });
+    }
+  }
+
+  /**
+   * 调试日志输出
+   */
+  debugLog(message, data = null) {
+    if (this.enableDebugLog) {
+      this.writeLog('DEBUG', message, data);
+    }
+  }
+
+  /**
+   * 错误日志输出
+   */
+  errorLog(message, error = null) {
+    this.writeLog('ERROR', message, null, error);
+  }
+
+  /**
+   * 信息日志输出
+   */
+  infoLog(message, data = null) {
+    this.writeLog('INFO', message, data);
   }
 
   /**
@@ -74,19 +166,20 @@ class ApiTestMCPServer {
       // 输出数据存储路径信息
       console.error(`[API Test MCP] Project directory: ${projectDir}`);
       console.error(`[API Test MCP] Data directory: ${DATA_DIR}`);
-      
+
       await fs.mkdir(DATA_DIR, { recursive: true });
       await fs.mkdir(SUITES_DIR, { recursive: true });
       await fs.mkdir(RESULTS_DIR, { recursive: true });
       await fs.mkdir(SNAPSHOTS_DIR, { recursive: true });
-      
+      await fs.mkdir(LOGS_DIR, { recursive: true });
+
       // 初始化环境配置文件
       try {
         await fs.access(ENVS_FILE);
       } catch {
         await fs.writeFile(ENVS_FILE, JSON.stringify({ environments: [], active: null }, null, 2));
       }
-      
+
       console.error(`[API Test MCP] Initialized successfully`);
     } catch (error) {
       console.error('Failed to initialize data directories:', error);
@@ -99,7 +192,7 @@ class ApiTestMCPServer {
   async loadActiveEnvironment() {
     try {
       const data = JSON.parse(await fs.readFile(ENVS_FILE, 'utf8'));
-      
+
       if (data.environments.length === 1) {
         // 如果只有一个环境，自动设为活动环境
         this.activeEnvironment = data.environments[0];
@@ -134,7 +227,7 @@ class ApiTestMCPServer {
               properties: {}
             }
           },
-          
+
           // === API信息获取 ===
           {
             name: "api_fetch_swagger",
@@ -225,7 +318,7 @@ class ApiTestMCPServer {
               required: ["controller"]
             }
           },
-          
+
           // === 认证管理 ===
           {
             name: "auth_validate",
@@ -262,7 +355,7 @@ class ApiTestMCPServer {
               required: ["token"]
             }
           },
-          
+
           // === 测试执行 ===
           {
             name: "test_execute_request",
@@ -354,7 +447,7 @@ class ApiTestMCPServer {
               required: ["requests"]
             }
           },
-          
+
           // === 测试上下文管理 ===
           {
             name: "test_context_set",
@@ -403,7 +496,7 @@ class ApiTestMCPServer {
               properties: {}
             }
           },
-          
+
           // === 测试套件管理 ===
           {
             name: "test_suite_save",
@@ -467,7 +560,7 @@ class ApiTestMCPServer {
               required: ["name"]
             }
           },
-          
+
           // === 测试结果管理 ===
           {
             name: "test_result_save",
@@ -535,7 +628,7 @@ class ApiTestMCPServer {
               required: ["batchId"]
             }
           },
-          
+
           // === 数据库操作 ===
           {
             name: "db_snapshot_create",
@@ -603,7 +696,41 @@ class ApiTestMCPServer {
               required: ["query"]
             }
           },
-          
+
+          // === 聊天记录查询 ===
+          {
+            name: "chat_group_messages",
+            description: "微信群消息汇总, 查询群名包含指定关键词的所有群组在指定时间范围内的全部聊天记录",
+            inputSchema: {
+              type: "object",
+              properties: {
+                groupKeyword: {
+                  type: "string",
+                  description: "群名关键词（必填，如：'翠鸟' 将匹配所有包含'翠鸟'的群）"
+                },
+                startTime: {
+                  type: "string",
+                  description: "开始时间（ISO格式：2024-01-18T00:00:00 或日期格式：2024-01-18）, 如果传入日期, 则开始日期需要是查询范围前一天, 比如2024-01-18指的是查2024-01-19开始的消息"
+                },
+                endTime: {
+                  type: "string",
+                  description: "结束时间（ISO格式：2024-01-18T23:59:59 或日期格式：2024-01-18）"
+                },
+                messageKeyword: {
+                  type: "string",
+                  description: "消息内容关键词过滤（可选，用于进一步过滤聊天记录）"
+                },
+                groupBy: {
+                  type: "string",
+                  enum: ["none", "group", "time"],
+                  description: "分组方式（none=不分组，group=按群组分组，time=按时间分组）",
+                  default: "group"
+                }
+              },
+              required: ["groupKeyword"]
+            }
+          },
+
           // === 日志查询 ===
           {
             name: "log_list",
@@ -695,7 +822,7 @@ class ApiTestMCPServer {
               required: ["fileName"]
             }
           },
-          
+
           // === 工具函数 ===
           {
             name: "parse_application_yml",
@@ -724,7 +851,7 @@ class ApiTestMCPServer {
           // 环境状态查询
           case "test_env_get_active":
             return await this.handleEnvGetActive(args);
-          
+
           // API信息获取
           case "api_fetch_swagger":
             return await this.handleFetchSwagger(args);
@@ -736,7 +863,7 @@ class ApiTestMCPServer {
             return await this.handleParseControllers(args);
           case "api_get_endpoints":
             return await this.handleGetEndpoints(args);
-          
+
           // 认证管理
           case "auth_validate":
             return await this.handleAuthValidate(args);
@@ -744,13 +871,13 @@ class ApiTestMCPServer {
             return await this.handleAuthGetToken(args);
           case "auth_set_token":
             return await this.handleAuthSetToken(args);
-          
+
           // 测试执行
           case "test_execute_request":
             return await this.handleExecuteRequest(args);
           case "test_batch_execute":
             return await this.handleBatchExecute(args);
-          
+
           // 测试上下文管理
           case "test_context_set":
             return await this.handleContextSet(args);
@@ -760,7 +887,7 @@ class ApiTestMCPServer {
             return await this.handleContextClear(args);
           case "test_context_keys":
             return await this.handleContextKeys(args);
-          
+
           // 测试套件管理
           case "test_suite_save":
             return await this.handleSuiteSave(args);
@@ -770,7 +897,7 @@ class ApiTestMCPServer {
             return await this.handleSuiteLoad(args);
           case "test_suite_delete":
             return await this.handleSuiteDelete(args);
-          
+
           // 测试结果管理
           case "test_result_save":
             return await this.handleResultSave(args);
@@ -778,7 +905,7 @@ class ApiTestMCPServer {
             return await this.handleResultQuery(args);
           case "test_result_summary":
             return await this.handleResultSummary(args);
-          
+
           // 数据库操作
           case "db_snapshot_create":
             return await this.handleSnapshotCreate(args);
@@ -788,7 +915,11 @@ class ApiTestMCPServer {
             return await this.handleSnapshotRestore(args);
           case "db_execute_query":
             return await this.handleExecuteQuery(args);
-          
+
+          // 聊天记录查询
+          case "chat_group_messages":
+            return await this.handleChatGroupMessages(args);
+
           // 日志查询
           case "log_list":
             return await this.handleLogList(args);
@@ -798,11 +929,11 @@ class ApiTestMCPServer {
             return await this.handleLogTail(args);
           case "log_download":
             return await this.handleLogDownload(args);
-          
+
           // 工具函数
           case "parse_application_yml":
             return await this.handleParseApplicationYml(args);
-          
+
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -821,7 +952,7 @@ class ApiTestMCPServer {
   }
 
   // === 环境状态查询实现 ===
-  
+
   async handleEnvGetActive(args) {
     if (!this.activeEnvironment) {
       return {
@@ -834,13 +965,14 @@ class ApiTestMCPServer {
         }]
       };
     }
-    
+
     // 构建环境信息，包含测试用户信息供Claude使用
     const envInfo = {
       active: this.activeEnvironment.name,
       baseUrl: this.activeEnvironment.baseUrl,
       swaggerUrl: this.activeEnvironment.swaggerUrl,
       logServerUrl: this.getLogServerBaseUrl(),
+      chatServerUrl: this.getChatServerBaseUrl(),
       hasAuth: !!this.activeEnvironment.authConfig,
       hasDatabase: !!this.activeEnvironment.database,
       hasLogServer: !!this.activeEnvironment.logServerUrl,
@@ -882,25 +1014,25 @@ class ApiTestMCPServer {
   }
 
   // === API信息获取实现 ===
-  
+
   async handleFetchSwagger(args) {
     const { url, section = "all" } = args;
-    
+
     let swaggerUrl = url;
     if (!swaggerUrl && this.activeEnvironment) {
       swaggerUrl = this.activeEnvironment.baseUrl + this.activeEnvironment.swaggerUrl;
     }
-    
+
     if (!swaggerUrl) {
       throw new Error('No Swagger URL provided and no active environment');
     }
-    
+
     try {
       const response = await axios.get(swaggerUrl, { timeout: 10000 });
       const doc = response.data;
-      
+
       let result;
-      
+
       switch (section) {
         case "info":
           result = {
@@ -909,15 +1041,15 @@ class ApiTestMCPServer {
             servers: doc.servers
           };
           break;
-          
+
         case "servers":
           result = { servers: doc.servers };
           break;
-          
+
         case "tags":
           result = { tags: doc.tags };
           break;
-          
+
         case "paths":
           // 只返回路径和方法，不包含详细定义
           const simplifiedPaths = {};
@@ -934,11 +1066,11 @@ class ApiTestMCPServer {
           }
           result = { paths: simplifiedPaths };
           break;
-          
+
         case "components":
           result = { components: doc.components };
           break;
-          
+
         case "all":
         default:
           // 返回简化版本：基本信息 + 简化的路径
@@ -950,7 +1082,7 @@ class ApiTestMCPServer {
             pathsCount: Object.keys(doc.paths || {}).length,
             paths: {}
           };
-          
+
           // 只包含路径、方法和基本信息，不包含复杂的schema定义
           for (const [path, methods] of Object.entries(doc.paths || {})) {
             allSimplified.paths[path] = {};
@@ -970,11 +1102,11 @@ class ApiTestMCPServer {
               };
             }
           }
-          
+
           result = allSimplified;
           break;
       }
-      
+
       return {
         content: [{
           type: "text",
@@ -988,24 +1120,24 @@ class ApiTestMCPServer {
 
   async handleGetSwaggerSummary(args) {
     const { url } = args;
-    
+
     let swaggerUrl = url;
     if (!swaggerUrl && this.activeEnvironment) {
       swaggerUrl = this.activeEnvironment.baseUrl + this.activeEnvironment.swaggerUrl;
     }
-    
+
     if (!swaggerUrl) {
       throw new Error('No Swagger URL provided and no active environment');
     }
-    
+
     try {
       const response = await axios.get(swaggerUrl, { timeout: 10000 });
       const doc = response.data;
-      
+
       // 统计接口数量
       const pathStats = {};
       let totalEndpoints = 0;
-      
+
       for (const [path, methods] of Object.entries(doc.paths || {})) {
         for (const [method, operation] of Object.entries(methods)) {
           totalEndpoints++;
@@ -1013,7 +1145,7 @@ class ApiTestMCPServer {
           pathStats[tag] = (pathStats[tag] || 0) + 1;
         }
       }
-      
+
       const summary = {
         openapi: doc.openapi,
         info: doc.info,
@@ -1026,7 +1158,7 @@ class ApiTestMCPServer {
         },
         availableSections: ["info", "servers", "tags", "paths", "components"]
       };
-      
+
       return {
         content: [{
           type: "text",
@@ -1040,26 +1172,26 @@ class ApiTestMCPServer {
 
   async handleGetServiceApis(args) {
     const { url, tag, includeExamples = true } = args;
-    
+
     // 确定要使用的URL
     let swaggerUrl = url;
     if (!swaggerUrl && this.activeEnvironment) {
       swaggerUrl = this.activeEnvironment.baseUrl + this.activeEnvironment.swaggerUrl;
     }
-    
+
     if (!swaggerUrl) {
       throw new Error('No Swagger URL provided and no active environment configured');
     }
-    
+
     try {
       // 获取完整的Swagger文档
       const response = await axios.get(swaggerUrl, { timeout: 10000 });
       const doc = response.data;
-      
+
       if (!doc.paths) {
         throw new Error('Invalid Swagger document: no paths found');
       }
-      
+
       const serviceApis = {
         serviceInfo: {
           title: doc.info?.title || 'Unknown Service',
@@ -1069,7 +1201,7 @@ class ApiTestMCPServer {
         },
         apis: []
       };
-      
+
       // 遍历所有路径和方法
       for (const [path, methods] of Object.entries(doc.paths)) {
         for (const [method, operation] of Object.entries(methods)) {
@@ -1077,7 +1209,7 @@ class ApiTestMCPServer {
           if (tag && (!operation.tags || !operation.tags.includes(tag))) {
             continue;
           }
-          
+
           const apiInfo = {
             path: path,
             method: method.toUpperCase(),
@@ -1089,7 +1221,7 @@ class ApiTestMCPServer {
             requestBody: null,
             responses: {}
           };
-          
+
           // 解析参数
           if (operation.parameters) {
             for (const param of operation.parameters) {
@@ -1101,15 +1233,15 @@ class ApiTestMCPServer {
                 type: this.getParameterType(param),
                 schema: param.schema
               };
-              
+
               if (includeExamples && param.example) {
                 paramInfo.example = param.example;
               }
-              
+
               apiInfo.parameters.push(paramInfo);
             }
           }
-          
+
           // 解析请求体
           if (operation.requestBody) {
             const requestBody = {
@@ -1117,30 +1249,30 @@ class ApiTestMCPServer {
               required: operation.requestBody.required || false,
               contentTypes: {}
             };
-            
+
             if (operation.requestBody.content) {
               for (const [contentType, content] of Object.entries(operation.requestBody.content)) {
                 const contentInfo = {
                   type: contentType,
                   schema: content.schema
                 };
-                
+
                 if (includeExamples && content.example) {
                   contentInfo.example = content.example;
                 }
-                
+
                 // 解析schema为可读格式
                 if (content.schema) {
                   contentInfo.structure = this.parseSchema(content.schema, doc.components?.schemas);
                 }
-                
+
                 requestBody.contentTypes[contentType] = contentInfo;
               }
             }
-            
+
             apiInfo.requestBody = requestBody;
           }
-          
+
           // 解析响应
           if (operation.responses) {
             for (const [statusCode, response] of Object.entries(operation.responses)) {
@@ -1149,54 +1281,54 @@ class ApiTestMCPServer {
                 description: response.description || '',
                 contentTypes: {}
               };
-              
+
               if (response.content) {
                 for (const [contentType, content] of Object.entries(response.content)) {
                   const contentInfo = {
                     type: contentType,
                     schema: content.schema
                   };
-                  
+
                   if (includeExamples && content.example) {
                     contentInfo.example = content.example;
                   }
-                  
+
                   // 解析schema为可读格式
                   if (content.schema) {
                     contentInfo.structure = this.parseSchema(content.schema, doc.components?.schemas);
                   }
-                  
+
                   responseInfo.contentTypes[contentType] = contentInfo;
                 }
               }
-              
+
               apiInfo.responses[statusCode] = responseInfo;
             }
           }
-          
+
           serviceApis.apis.push(apiInfo);
         }
       }
-      
+
       // 添加统计信息
       serviceApis.statistics = {
         totalApis: serviceApis.apis.length,
         apisByMethod: {},
         apisByTag: {}
       };
-      
+
       serviceApis.apis.forEach(api => {
         // 按方法统计
-        serviceApis.statistics.apisByMethod[api.method] = 
+        serviceApis.statistics.apisByMethod[api.method] =
           (serviceApis.statistics.apisByMethod[api.method] || 0) + 1;
-        
+
         // 按标签统计
         api.tags.forEach(t => {
-          serviceApis.statistics.apisByTag[t] = 
+          serviceApis.statistics.apisByTag[t] =
             (serviceApis.statistics.apisByTag[t] || 0) + 1;
         });
       });
-      
+
       return {
         content: [{
           type: "text",
@@ -1207,7 +1339,7 @@ class ApiTestMCPServer {
       throw new Error(`Failed to get service APIs: ${error.message}`);
     }
   }
-  
+
   // 辅助方法：获取参数类型
   getParameterType(param) {
     if (param.schema) {
@@ -1215,11 +1347,11 @@ class ApiTestMCPServer {
     }
     return param.type || 'string';
   }
-  
+
   // 辅助方法：解析Schema为可读结构
   parseSchema(schema, components = {}) {
     if (!schema) return null;
-    
+
     // 处理引用
     if (schema.$ref) {
       const refPath = schema.$ref.replace('#/components/schemas/', '');
@@ -1228,15 +1360,15 @@ class ApiTestMCPServer {
       }
       return { type: 'reference', ref: refPath };
     }
-    
+
     const result = {
       type: schema.type || 'object'
     };
-    
+
     if (schema.description) {
       result.description = schema.description;
     }
-    
+
     // 处理对象类型
     if (schema.type === 'object' && schema.properties) {
       result.properties = {};
@@ -1247,47 +1379,47 @@ class ApiTestMCPServer {
         result.required = schema.required;
       }
     }
-    
+
     // 处理数组类型
     if (schema.type === 'array' && schema.items) {
       result.items = this.parseSchema(schema.items, components);
     }
-    
+
     // 处理枚举
     if (schema.enum) {
       result.enum = schema.enum;
     }
-    
+
     // 处理格式和约束
     if (schema.format) result.format = schema.format;
     if (schema.minimum !== undefined) result.minimum = schema.minimum;
     if (schema.maximum !== undefined) result.maximum = schema.maximum;
     if (schema.pattern) result.pattern = schema.pattern;
-    
+
     return result;
   }
 
   async handleParseControllers(args) {
     const { swaggerDoc } = args;
-    
+
     let doc = swaggerDoc;
     if (!doc) {
       // 只获取路径信息用于解析Controller
       const result = await this.handleFetchSwagger({ section: "paths" });
       const pathData = JSON.parse(result.content[0].text);
-      
+
       // 还需要tags信息
       const tagsResult = await this.handleFetchSwagger({ section: "tags" });
       const tagsData = JSON.parse(tagsResult.content[0].text);
-      
+
       doc = {
         paths: pathData.paths,
         tags: tagsData.tags
       };
     }
-    
+
     const controllers = new Map();
-    
+
     // 解析paths，按tag分组
     for (const [path, methods] of Object.entries(doc.paths || {})) {
       for (const [method, operation] of Object.entries(methods)) {
@@ -1300,7 +1432,7 @@ class ApiTestMCPServer {
               endpoints: []
             });
           }
-          
+
           controllers.get(tag).endpoints.push({
             path,
             method: method.toUpperCase(),
@@ -1310,7 +1442,7 @@ class ApiTestMCPServer {
         }
       }
     }
-    
+
     return {
       content: [{
         type: "text",
@@ -1321,16 +1453,16 @@ class ApiTestMCPServer {
 
   async handleGetEndpoints(args) {
     const { controller, swaggerDoc } = args;
-    
+
     let doc = swaggerDoc;
     if (!doc) {
       // 获取完整的路径信息（包含详细的API定义）
       const result = await this.handleFetchSwagger({ section: "all" });
       doc = JSON.parse(result.content[0].text);
     }
-    
+
     const endpoints = [];
-    
+
     for (const [path, methods] of Object.entries(doc.paths || {})) {
       for (const [method, operation] of Object.entries(methods)) {
         if (operation.tags && operation.tags.includes(controller)) {
@@ -1347,7 +1479,7 @@ class ApiTestMCPServer {
         }
       }
     }
-    
+
     return {
       content: [{
         type: "text",
@@ -1357,7 +1489,7 @@ class ApiTestMCPServer {
   }
 
   // === 认证管理实现 ===
-  
+
   async handleAuthValidate(args) {
     if (!this.authToken) {
       return {
@@ -1370,7 +1502,7 @@ class ApiTestMCPServer {
         }]
       };
     }
-    
+
     // TODO: 实际验证token有效性（调用验证接口）
     return {
       content: [{
@@ -1399,16 +1531,16 @@ class ApiTestMCPServer {
 
   async handleAuthSetToken(args) {
     const { token, tokenType } = args;
-    
+
     if (!token) {
       throw new Error('Token is required');
     }
-    
+
     // 验证token格式（基本验证）
     if (typeof token !== 'string' || token.trim().length === 0) {
       throw new Error('Token must be a non-empty string');
     }
-    
+
     // 如果提供了tokenType，验证是否与环境配置匹配
     if (tokenType && this.activeEnvironment?.authConfig?.type) {
       const envTokenType = this.activeEnvironment.authConfig.type;
@@ -1416,9 +1548,9 @@ class ApiTestMCPServer {
         console.warn(`Warning: Provided token type '${tokenType}' doesn't match environment config '${envTokenType}'`);
       }
     }
-    
+
     this.authToken = token.trim();
-    
+
     return {
       content: [{
         type: "text",
@@ -1434,25 +1566,25 @@ class ApiTestMCPServer {
   }
 
   // === 测试执行实现 ===
-  
+
   async handleExecuteRequest(args) {
     const { url, method, headers = {}, params, body, useAuth = true, timeout = 30000 } = args;
-    
+
     let fullUrl = url;
     if (!url.startsWith('http') && this.activeEnvironment) {
       fullUrl = this.activeEnvironment.baseUrl + url;
     }
-    
+
     // 添加认证头
     const requestHeaders = { ...headers };
     if (useAuth && this.authToken && this.activeEnvironment?.authConfig) {
       const authConfig = this.activeEnvironment.authConfig;
-      requestHeaders[authConfig.headerName || 'Authorization'] = 
+      requestHeaders[authConfig.headerName || 'Authorization'] =
         `${authConfig.headerPrefix || 'Bearer'} ${this.authToken}`;
     }
-    
+
     const startTime = Date.now();
-    
+
     try {
       const response = await axios({
         url: fullUrl,
@@ -1463,9 +1595,9 @@ class ApiTestMCPServer {
         timeout,
         validateStatus: () => true // 不要抛出HTTP错误
       });
-      
+
       const endTime = Date.now();
-      
+
       return {
         content: [{
           type: "text",
@@ -1514,24 +1646,24 @@ class ApiTestMCPServer {
 
   async handleBatchExecute(args) {
     const { requests, batchId = uuidv4(), parallel = false } = args;
-    
+
     const results = [];
-    
+
     if (parallel) {
       // 并行执行
-      const promises = requests.map(req => 
+      const promises = requests.map(req =>
         this.handleExecuteRequest({
           ...req,
           useAuth: req.useAuth !== false
         })
       );
-      
+
       const responses = await Promise.allSettled(promises);
-      
+
       for (let i = 0; i < responses.length; i++) {
         const response = responses[i];
         const request = requests[i];
-        
+
         if (response.status === 'fulfilled') {
           results.push({
             id: request.id || `request_${i}`,
@@ -1553,7 +1685,7 @@ class ApiTestMCPServer {
             ...request,
             useAuth: request.useAuth !== false
           });
-          
+
           results.push({
             id: request.id || `request_${i}`,
             ...JSON.parse(response.content[0].text)
@@ -1566,7 +1698,7 @@ class ApiTestMCPServer {
         }
       }
     }
-    
+
     return {
       content: [{
         type: "text",
@@ -1581,20 +1713,20 @@ class ApiTestMCPServer {
   }
 
   // === 测试上下文管理实现 ===
-  
+
   async handleContextSet(args) {
     const { key, value } = args;
-    
+
     // 设置用户指定的键值对
     this.testContext.set(key, value);
-    
+
     // 自动设置当前日期相关信息
     const now = new Date();
     this.testContext.set('current_date', now.toISOString().split('T')[0]); // YYYY-MM-DD
     this.testContext.set('current_datetime', now.toISOString()); // ISO格式完整时间
     this.testContext.set('current_timestamp', now.getTime()); // Unix时间戳
     this.testContext.set('current_date_cn', now.toLocaleDateString('zh-CN')); // 中文日期格式
-    
+
     return {
       content: [{
         type: "text",
@@ -1605,9 +1737,9 @@ class ApiTestMCPServer {
 
   async handleContextGet(args) {
     const { key } = args;
-    
+
     const value = this.testContext.get(key);
-    
+
     return {
       content: [{
         type: "text",
@@ -1623,7 +1755,7 @@ class ApiTestMCPServer {
   async handleContextClear(args) {
     const size = this.testContext.size;
     this.testContext.clear();
-    
+
     return {
       content: [{
         type: "text",
@@ -1634,13 +1766,13 @@ class ApiTestMCPServer {
 
   async handleContextKeys(args) {
     const keys = Array.from(this.testContext.keys());
-    
+
     // 将键按类型分组
     const autoKeys = keys.filter(key => key.startsWith('current_'));
     const userKeys = keys.filter(key => !key.startsWith('current_'));
-    
+
     let output = `测试上下文键列表 (共 ${keys.length} 个):\n\n`;
-    
+
     if (autoKeys.length > 0) {
       output += '📅 自动日期键:\n';
       autoKeys.forEach(key => {
@@ -1649,22 +1781,22 @@ class ApiTestMCPServer {
       });
       output += '\n';
     }
-    
+
     if (userKeys.length > 0) {
       output += '👤 用户自定义键:\n';
       userKeys.forEach(key => {
         const value = this.testContext.get(key);
-        const displayValue = typeof value === 'string' && value.length > 50 
-          ? value.substring(0, 50) + '...' 
+        const displayValue = typeof value === 'string' && value.length > 50
+          ? value.substring(0, 50) + '...'
           : value;
         output += `  - ${key}: ${displayValue}\n`;
       });
     }
-    
+
     if (keys.length === 0) {
       output = '上下文为空，没有存储任何数据';
     }
-    
+
     return {
       content: [{
         type: "text",
@@ -1674,10 +1806,10 @@ class ApiTestMCPServer {
   }
 
   // === 测试套件管理实现 ===
-  
+
   async handleSuiteSave(args) {
     const { name, description, testCases, environment } = args;
-    
+
     const suite = {
       id: uuidv4(),
       name,
@@ -1687,10 +1819,10 @@ class ApiTestMCPServer {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    
+
     const filePath = join(SUITES_DIR, `${name}.json`);
     await fs.writeFile(filePath, JSON.stringify(suite, null, 2));
-    
+
     return {
       content: [{
         type: "text",
@@ -1702,7 +1834,7 @@ class ApiTestMCPServer {
   async handleSuiteList(args) {
     const files = await fs.readdir(SUITES_DIR);
     const suites = [];
-    
+
     for (const file of files) {
       if (file.endsWith('.json')) {
         const content = await fs.readFile(join(SUITES_DIR, file), 'utf8');
@@ -1716,7 +1848,7 @@ class ApiTestMCPServer {
         });
       }
     }
-    
+
     return {
       content: [{
         type: "text",
@@ -1727,9 +1859,9 @@ class ApiTestMCPServer {
 
   async handleSuiteLoad(args) {
     const { name } = args;
-    
+
     const filePath = join(SUITES_DIR, `${name}.json`);
-    
+
     try {
       const content = await fs.readFile(filePath, 'utf8');
       return {
@@ -1745,9 +1877,9 @@ class ApiTestMCPServer {
 
   async handleSuiteDelete(args) {
     const { name } = args;
-    
+
     const filePath = join(SUITES_DIR, `${name}.json`);
-    
+
     try {
       await fs.unlink(filePath);
       return {
@@ -1762,10 +1894,10 @@ class ApiTestMCPServer {
   }
 
   // === 测试结果管理实现 ===
-  
+
   async handleResultSave(args) {
     const { batchId, testCase, result, environment } = args;
-    
+
     const resultData = {
       id: uuidv4(),
       batchId,
@@ -1774,12 +1906,12 @@ class ApiTestMCPServer {
       environment: environment || this.activeEnvironment?.name,
       timestamp: new Date().toISOString()
     };
-    
+
     const fileName = `${batchId}_${Date.now()}.json`;
     const filePath = join(RESULTS_DIR, fileName);
-    
+
     await fs.writeFile(filePath, JSON.stringify(resultData, null, 2));
-    
+
     return {
       content: [{
         type: "text",
@@ -1790,25 +1922,25 @@ class ApiTestMCPServer {
 
   async handleResultQuery(args) {
     const { batchId, dateFrom, dateTo, status } = args;
-    
+
     const files = await fs.readdir(RESULTS_DIR);
     const results = [];
-    
+
     for (const file of files) {
       if (file.endsWith('.json')) {
         const content = await fs.readFile(join(RESULTS_DIR, file), 'utf8');
         const result = JSON.parse(content);
-        
+
         // 过滤条件
         if (batchId && result.batchId !== batchId) continue;
         if (dateFrom && new Date(result.timestamp) < new Date(dateFrom)) continue;
         if (dateTo && new Date(result.timestamp) > new Date(dateTo)) continue;
         if (status && result.result.status !== status) continue;
-        
+
         results.push(result);
       }
     }
-    
+
     return {
       content: [{
         type: "text",
@@ -1819,27 +1951,27 @@ class ApiTestMCPServer {
 
   async handleResultSummary(args) {
     const { batchId } = args;
-    
+
     const files = await fs.readdir(RESULTS_DIR);
     let total = 0, passed = 0, failed = 0, error = 0;
     let totalTime = 0;
-    
+
     for (const file of files) {
       if (file.startsWith(batchId) && file.endsWith('.json')) {
         const content = await fs.readFile(join(RESULTS_DIR, file), 'utf8');
         const result = JSON.parse(content);
-        
+
         total++;
         if (result.result.status === 'passed') passed++;
         else if (result.result.status === 'failed') failed++;
         else if (result.result.status === 'error') error++;
-        
+
         if (result.result.responseTime) {
           totalTime += result.result.responseTime;
         }
       }
     }
-    
+
     return {
       content: [{
         type: "text",
@@ -1859,7 +1991,7 @@ class ApiTestMCPServer {
   }
 
   // === 数据库连接辅助函数 ===
-  
+
   async createDatabaseConnection(dbConfig) {
     if (dbConfig.type === 'mysql') {
       return await mysql.createConnection({
@@ -1893,22 +2025,22 @@ class ApiTestMCPServer {
   }
 
   // === 数据库操作实现 ===
-  
+
   async handleSnapshotCreate(args) {
     const { name, tables = [] } = args;
-    
+
     if (!this.activeEnvironment?.database) {
       throw new Error('No database configuration in active environment');
     }
-    
+
     const db = this.activeEnvironment.database;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const snapshotFile = join(SNAPSHOTS_DIR, `${name}_${timestamp}.json`);
-    
+
     let connection;
     try {
       connection = await this.createDatabaseConnection(db);
-      
+
       // 获取要备份的表列表
       let targetTables = tables;
       if (targetTables.length === 0) {
@@ -1921,7 +2053,7 @@ class ApiTestMCPServer {
           targetTables = result.rows.map(row => row.tablename);
         }
       }
-      
+
       // 备份数据
       const backupData = {
         metadata: {
@@ -1934,10 +2066,10 @@ class ApiTestMCPServer {
         },
         tables: {}
       };
-      
+
       for (const tableName of targetTables) {
         console.error(`[DB Backup] Backing up table: ${tableName}`);
-        
+
         // 获取表结构
         let createTableSQL = '';
         if (db.type === 'mysql') {
@@ -1947,17 +2079,17 @@ class ApiTestMCPServer {
           // PostgreSQL 表结构获取比较复杂，这里简化处理
           const result = await connection.query(`
             SELECT column_name, data_type, is_nullable, column_default
-            FROM information_schema.columns 
+            FROM information_schema.columns
             WHERE table_name = $1 AND table_schema = 'public'
             ORDER BY ordinal_position
           `, [tableName]);
-          
-          const columns = result.rows.map(col => 
+
+          const columns = result.rows.map(col =>
             `${col.column_name} ${col.data_type}${col.is_nullable === 'NO' ? ' NOT NULL' : ''}${col.column_default ? ` DEFAULT ${col.column_default}` : ''}`
           ).join(', ');
           createTableSQL = `CREATE TABLE ${tableName} (${columns})`;
         }
-        
+
         // 获取表数据
         let tableData = [];
         if (db.type === 'mysql') {
@@ -1967,23 +2099,23 @@ class ApiTestMCPServer {
           const result = await connection.query(`SELECT * FROM "${tableName}"`);
           tableData = result.rows;
         }
-        
+
         backupData.tables[tableName] = {
           structure: createTableSQL,
           data: tableData,
           rowCount: tableData.length
         };
       }
-      
+
       // 保存备份文件
       await fs.writeFile(snapshotFile, JSON.stringify(backupData, null, 2));
-      
+
       // 保存快照元数据
       const metaFile = join(SNAPSHOTS_DIR, `${name}_${timestamp}.meta.json`);
       await fs.writeFile(metaFile, JSON.stringify(backupData.metadata, null, 2));
-      
+
       const totalRows = Object.values(backupData.tables).reduce((sum, table) => sum + table.rowCount, 0);
-      
+
       return {
         content: [{
           type: "text",
@@ -2002,14 +2134,14 @@ class ApiTestMCPServer {
   async handleSnapshotList(args) {
     const files = await fs.readdir(SNAPSHOTS_DIR);
     const snapshots = [];
-    
+
     for (const file of files) {
       if (file.endsWith('.meta.json')) {
         const content = await fs.readFile(join(SNAPSHOTS_DIR, file), 'utf8');
         snapshots.push(JSON.parse(content));
       }
     }
-    
+
     return {
       content: [{
         type: "text",
@@ -2020,40 +2152,40 @@ class ApiTestMCPServer {
 
   async handleSnapshotRestore(args) {
     const { name, dropExisting = false } = args;
-    
+
     if (!this.activeEnvironment?.database) {
       throw new Error('No database configuration in active environment');
     }
-    
+
     const db = this.activeEnvironment.database;
-    
+
     // 查找快照文件
     const files = await fs.readdir(SNAPSHOTS_DIR);
     const snapshotFile = files.find(f => f.startsWith(`${name}_`) && f.endsWith('.json'));
-    
+
     if (!snapshotFile) {
       throw new Error(`Snapshot '${name}' not found`);
     }
-    
+
     const snapshotPath = join(SNAPSHOTS_DIR, snapshotFile);
-    
+
     let connection;
     try {
       // 读取备份数据
       const backupData = JSON.parse(await fs.readFile(snapshotPath, 'utf8'));
-      
+
       if (backupData.metadata.dbType !== db.type) {
         throw new Error(`Snapshot database type (${backupData.metadata.dbType}) doesn't match current environment (${db.type})`);
       }
-      
+
       connection = await this.createDatabaseConnection(db);
-      
+
       let restoredTables = 0;
       let restoredRows = 0;
-      
+
       for (const [tableName, tableData] of Object.entries(backupData.tables)) {
         console.error(`[DB Restore] Restoring table: ${tableName}`);
-        
+
         if (dropExisting) {
           // 删除现有表
           try {
@@ -2066,7 +2198,7 @@ class ApiTestMCPServer {
             console.error(`[DB Restore] Warning: Failed to drop table ${tableName}: ${error.message}`);
           }
         }
-        
+
         // 清空表数据（如果表存在）
         try {
           if (db.type === 'mysql') {
@@ -2088,17 +2220,17 @@ class ApiTestMCPServer {
             }
           }
         }
-        
+
         // 恢复数据
         if (tableData.data && tableData.data.length > 0) {
           // 获取列名
           const columns = Object.keys(tableData.data[0]);
-          
+
           if (db.type === 'mysql') {
             const placeholders = columns.map(() => '?').join(', ');
             const columnList = columns.map(col => `\`${col}\``).join(', ');
             const insertSQL = `INSERT INTO \`${tableName}\` (${columnList}) VALUES (${placeholders})`;
-            
+
             for (const row of tableData.data) {
               const values = columns.map(col => row[col]);
               await connection.execute(insertSQL, values);
@@ -2107,19 +2239,19 @@ class ApiTestMCPServer {
             const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
             const columnList = columns.map(col => `"${col}"`).join(', ');
             const insertSQL = `INSERT INTO "${tableName}" (${columnList}) VALUES (${placeholders})`;
-            
+
             for (const row of tableData.data) {
               const values = columns.map(col => row[col]);
               await connection.query(insertSQL, values);
             }
           }
-          
+
           restoredRows += tableData.data.length;
         }
-        
+
         restoredTables++;
       }
-      
+
       return {
         content: [{
           type: "text",
@@ -2137,23 +2269,23 @@ class ApiTestMCPServer {
 
   async handleExecuteQuery(args) {
     const { query, params = [] } = args;
-    
+
     if (!this.activeEnvironment?.database) {
       throw new Error('No database configuration in active environment');
     }
-    
+
     const db = this.activeEnvironment.database;
-    
+
     let connection;
     try {
       connection = await this.createDatabaseConnection(db);
-      
+
       let result;
       let affectedRows = 0;
-      
+
       if (db.type === 'mysql') {
         const [rows, fields] = await connection.execute(query, params);
-        
+
         // 检查是否是SELECT查询
         if (Array.isArray(rows)) {
           result = {
@@ -2176,7 +2308,7 @@ class ApiTestMCPServer {
         }
       } else if (db.type === 'postgres') {
         const queryResult = await connection.query(query, params);
-        
+
         if (queryResult.rows) {
           result = {
             rows: queryResult.rows,
@@ -2195,7 +2327,7 @@ class ApiTestMCPServer {
           };
         }
       }
-      
+
       // 格式化输出
       let output = '';
       if (result.rows) {
@@ -2205,36 +2337,36 @@ class ApiTestMCPServer {
         } else {
           // 创建表格输出
           const headers = Object.keys(result.rows[0]);
-          const maxWidths = headers.map(header => 
-            Math.max(header.length, ...result.rows.map(row => 
+          const maxWidths = headers.map(header =>
+            Math.max(header.length, ...result.rows.map(row =>
               String(row[header] || '').length
             ))
           );
-          
+
           // 表头
-          output += '|' + headers.map((header, i) => 
+          output += '|' + headers.map((header, i) =>
             ` ${header.padEnd(maxWidths[i])} `
           ).join('|') + '|\n';
-          
+
           // 分隔线
-          output += '|' + maxWidths.map(width => 
+          output += '|' + maxWidths.map(width =>
             '-'.repeat(width + 2)
           ).join('|') + '|\n';
-          
+
           // 数据行
           result.rows.forEach(row => {
-            output += '|' + headers.map((header, i) => 
+            output += '|' + headers.map((header, i) =>
               ` ${String(row[header] || '').padEnd(maxWidths[i])} `
             ).join('|') + '|\n';
           });
-          
+
           output += `\n${result.rowCount} row(s) returned.`;
         }
       } else {
         // INSERT/UPDATE/DELETE 结果
         output = result.message;
       }
-      
+
       return {
         content: [{
           type: "text",
@@ -2250,8 +2382,582 @@ class ApiTestMCPServer {
     }
   }
 
+  // === 聊天记录查询实现 ===
+
+  /**
+   * 获取聊天服务器的基础URL
+   */
+  getChatServerBaseUrl() {
+    // 聊天服务器固定地址
+    return 'http://127.0.0.1:5030';
+  }
+
+  /**
+   * 延迟函数
+   */
+  async delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * 带重试机制的HTTP请求
+   */
+  async fetchWithRetry(url, config, maxRetries = 3, context = '') {
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        this.debugLog(`${context ? `[${context}] ` : ''}尝试请求 (${attempt}/${maxRetries}): ${url}`, config);
+
+        const response = await axios.get(url, config);
+
+        if (attempt > 1) {
+          this.infoLog(`${context ? `[${context}] ` : ''}重试成功，第 ${attempt} 次尝试`);
+        }
+
+        return response;
+      } catch (error) {
+        lastError = error;
+        const isNetworkError = error.code === 'ECONNRESET' ||
+                              error.code === 'ECONNREFUSED' ||
+                              error.code === 'ETIMEDOUT' ||
+                              error.message.includes('timeout');
+
+        this.debugLog(`${context ? `[${context}] ` : ''}请求失败 (${attempt}/${maxRetries})`, {
+          error: error.message,
+          code: error.code,
+          isNetworkError
+        });
+
+        if (attempt < maxRetries && isNetworkError) {
+          // 指数退避：第一次重试等待1秒，第二次等待2秒
+          const delayMs = attempt * 1000;
+          this.infoLog(`${context ? `[${context}] ` : ''}网络错误，${delayMs}ms 后重试...`);
+          await this.delay(delayMs);
+        } else if (attempt < maxRetries) {
+          // 非网络错误，短暂延迟后重试
+          await this.delay(500);
+        }
+      }
+    }
+
+    // 所有重试都失败了
+    throw lastError;
+  }
+
+  /**
+   * 处理聊天记录查询
+   */
+  async handleChatGroupMessages(args) {
+    this.infoLog('开始处理聊天记录查询请求', args);
+
+    // 重置相关状态
+    if (this.logStream && this.logStream.pending) {
+      await new Promise(resolve => this.logStream.once('drain', resolve));
+    }
+
+    const {
+      groupKeyword,
+      startTime,
+      endTime,
+      messageKeyword,
+      groupBy = 'group'
+    } = args;
+
+    if (!groupKeyword) {
+      const error = '群名关键词是必需的参数';
+      this.errorLog(error);
+      throw new Error(error);
+    }
+
+    const chatServerUrl = this.getChatServerBaseUrl();
+    this.debugLog(`聊天服务器URL: ${chatServerUrl}`);
+
+    try {
+      // 处理时间参数
+      let timeParam = '';
+
+      if (startTime && endTime) {
+        // 如果提供了开始和结束时间，使用范围格式
+        const start = startTime.includes('T') ? startTime.split('T')[0] : startTime;
+        const end = endTime.includes('T') ? endTime.split('T')[0] : endTime;
+        timeParam = `${start}~${end}`;
+      } else if (startTime) {
+        // 只有开始时间
+        timeParam = startTime.includes('T') ? startTime.split('T')[0] : startTime;
+      } else if (endTime) {
+        // 只有结束时间
+        timeParam = endTime.includes('T') ? endTime.split('T')[0] : endTime;
+      } else {
+        // 没有提供时间，默认查询今天
+        const today = new Date().toISOString().split('T')[0];
+        timeParam = today;
+      }
+
+      this.infoLog(`处理后的时间参数: ${timeParam}`);
+      this.debugLog('开始获取群聊列表', { groupKeyword, timeParam });
+
+      // 首先获取群聊列表，筛选出包含关键词的群
+      const chatroomResponse = await this.fetchWithRetry(`${chatServerUrl}/api/v1/chatroom`, {
+        params: {
+          format: 'json',
+          keyword: groupKeyword  // API支持关键字参数直接过滤
+        },
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'MCP-ChatQuery/1.0'
+        }
+      }, 3, '群聊列表');
+
+      // 获取群组列表后添加延迟，避免立即查询聊天记录导致连接问题
+      this.debugLog('群组列表获取完成，等待1000ms后继续处理...');
+      await this.delay(1000);
+
+      // 强制垃圾回收以释放内存
+      if (global.gc) {
+        global.gc();
+      }
+
+      this.debugLog('群聊列表API响应', {
+        status: chatroomResponse.status,
+        dataType: typeof chatroomResponse.data,
+        hasItems: chatroomResponse.data?.items ? chatroomResponse.data.items.length : 0
+      });
+
+      const chatroomsData = chatroomResponse.data;
+      const matchedGroups = [];
+
+      // 处理API返回的数据格式 {items: [...]}
+      const chatrooms = chatroomsData.items || chatroomsData;
+
+      if (Array.isArray(chatrooms)) {
+        chatrooms.forEach(room => {
+          // 注意：API返回的群组ID字段是 "name" (如: 10289073030@chatroom)
+          // displayName可能为空，需要从其他地方获取群名
+          const groupId = room.name;
+          const displayName = room.displayName || room.nickname || '';
+
+          // 如果没有显示名称，使用群ID的简化形式
+          const groupName = displayName || `群组(${groupId.split('@')[0]})`;
+
+          matchedGroups.push({
+            id: groupId,
+            name: groupName,
+            owner: room.owner,
+            userCount: room.users ? room.users.length : 0
+          });
+        });
+      }
+
+      this.infoLog(`筛选出 ${matchedGroups.length} 个匹配的群组`);
+      this.debugLog('匹配的群组列表', matchedGroups);
+
+      if (matchedGroups.length === 0) {
+        this.infoLog(`未找到群名包含 "${groupKeyword}" 的群组`);
+        return {
+          content: [{
+            type: "text",
+            text: `未找到群名包含 "${groupKeyword}" 的群组。`
+          }]
+        };
+      }
+
+      // 对每个匹配的群组查询聊天记录
+      const allMessages = [];
+      let totalMessageCount = 0;
+
+      this.infoLog('开始查询各群组的聊天记录');
+
+      for (let i = 0; i < matchedGroups.length; i++) {
+        const group = matchedGroups[i];
+
+        // 在群组间添加延迟，避免请求过于频繁
+        if (i > 0) {
+          await this.delay(500); // 每个群组间隔500ms
+        }
+        try {
+          this.debugLog(`正在查询群组: ${group.name} (${group.id}) 的聊天记录`);
+
+          // 构建查询参数
+          const params = {
+            time: timeParam,
+            talker: group.id,
+            format: 'json'
+          };
+
+          this.debugLog(`群组 ${group.name} 请求参数:`, params);
+
+          // 添加重试机制 - 使用与浏览器完全一致的请求方式
+          const messagesResponse = await this.fetchWithRetry(`${chatServerUrl}/api/v1/chatlog`, {
+            params: params,
+            timeout: 30000,
+            headers: {
+              'Accept': '*/*',
+              'Accept-Encoding': 'gzip, deflate, br',
+              'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+              'Cache-Control': 'no-cache',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0',
+              'Sec-Fetch-Dest': 'empty',
+              'Sec-Fetch-Mode': 'cors',
+              'Sec-Fetch-Site': 'same-origin'
+            },
+            responseType: 'text'
+          }, 3, group.name);
+
+          // 解析JSON响应
+          let messages;
+          try {
+            this.debugLog(`群组 ${group.name} 响应状态: ${messagesResponse.status}`);
+            this.debugLog(`群组 ${group.name} 原始响应类型: ${typeof messagesResponse.data}`);
+            this.debugLog(`群组 ${group.name} 原始响应长度: ${messagesResponse.data.length}`);
+
+            messages = JSON.parse(messagesResponse.data);
+            this.debugLog(`群组 ${group.name} JSON解析成功，解析后类型: ${typeof messages}`);
+            this.debugLog(`群组 ${group.name} JSON解析后是否为数组: ${Array.isArray(messages)}`);
+
+            if (Array.isArray(messages)) {
+              this.debugLog(`群组 ${group.name} 数组长度: ${messages.length}`);
+            } else if (typeof messages === 'object') {
+              this.debugLog(`群组 ${group.name} 对象键数量: ${Object.keys(messages).length}`);
+            }
+          } catch (jsonError) {
+            this.errorLog(`群组 ${group.name} JSON解析失败`, jsonError);
+            this.debugLog(`群组 ${group.name} 原始响应内容: ${messagesResponse.data.substring(0, 1000)}`);
+            continue;
+          }
+
+          // 如果响应是类似数组的对象（键为数字字符串），转换为真正的数组
+          if (messages && typeof messages === 'object' && !Array.isArray(messages)) {
+            const keys = Object.keys(messages);
+            if (keys.length > 0 && keys.every(key => /^\d+$/.test(key))) {
+              this.debugLog(`群组 ${group.name} 检测到类数组对象，转换为数组`);
+              messages = Object.values(messages);
+            }
+          }
+
+          this.debugLog(`群组 ${group.name} 原始消息数量: ${Array.isArray(messages) ? messages.length : 0}`);
+
+          if (Array.isArray(messages) && messages.length > 0) {
+            this.debugLog(`开始处理群组 ${group.name} 的 ${messages.length} 条消息`);
+            // 如果有消息关键词过滤
+            const startFilterTime = Date.now();
+            const filteredMessages = messageKeyword
+              ? messages.filter((msg, index) => {
+                  // 每100条消息输出一次进度日志
+                  if (index > 0 && index % 100 === 0) {
+                    this.debugLog(`群组 ${group.name} 消息过滤进度: ${index}/${messages.length}`);
+                  }
+
+                  // 构建可搜索的文本内容
+                  let searchableContent = msg.content || '';
+
+                  // 根据消息类型添加可搜索的文本
+                  if (msg.type) {
+                    switch(msg.type) {
+                      case 43: // 视频
+                        searchableContent += ' 视频 video';
+                        if (msg.contents?.path) {
+                          searchableContent += ' ' + msg.contents.path;
+                        }
+                        break;
+                      case 47: // 动画表情
+                        searchableContent += ' 动画表情 表情 emoji';
+                        break;
+                      case 34: // 语音
+                        searchableContent += ' 语音 音频 voice';
+                        break;
+                      case 3: // 图片
+                        searchableContent += ' 图片 图像 image';
+                        if (msg.contents?.path) {
+                          searchableContent += ' ' + msg.contents.path;
+                        }
+                        if (msg.contents?.md5) {
+                          searchableContent += ' ' + msg.contents.md5;
+                        }
+                        break;
+                      case 49: // 引用/文件/链接/小程序等
+                        // 检查是否是引用消息
+                        if (msg.contents?.refer) {
+                          searchableContent += ' 引用 回复 reply';
+                          // 添加被引用的消息内容
+                          if (msg.contents.refer.content) {
+                            searchableContent += ' ' + msg.contents.refer.content;
+                          }
+                          if (msg.contents.refer.senderName) {
+                            searchableContent += ' ' + msg.contents.refer.senderName;
+                          }
+                        } else if (msg.contents?.title) {
+                          // 文件消息
+                          searchableContent += ' 文件 file';
+                          searchableContent += ' ' + msg.contents.title;
+                          if (msg.contents.md5) {
+                            searchableContent += ' ' + msg.contents.md5;
+                          }
+                        } else {
+                          // 其他类型（链接、小程序等）
+                          searchableContent += ' 链接 小程序 link miniprogram';
+                        }
+                        break;
+                    }
+                  }
+
+                  // 添加发送者信息到搜索内容
+                  if (msg.senderName) searchableContent += ' ' + msg.senderName;
+                  if (msg.sender) searchableContent += ' ' + msg.sender;
+
+                  // 添加contents内容到搜索
+                  if (msg.contents && typeof msg.contents === 'object') {
+                    searchableContent += ' ' + JSON.stringify(msg.contents);
+                  }
+
+                  // 检查是否包含关键词（不区分大小写）
+                  this.debugLog(`过滤聊天记录: ${searchableContent}`);
+                  return searchableContent.toLowerCase().includes(messageKeyword.toLowerCase());
+                })
+              : messages;
+
+            this.debugLog(`群组 ${group.name} 过滤后消息数量: ${filteredMessages.length}`, {
+              hasMessageKeyword: !!messageKeyword,
+              messageKeyword: messageKeyword
+            });
+
+            if (filteredMessages.length > 0) {
+              // 注意：API返回的talkerName可能就是群名
+              const actualGroupName = messages[0]?.talkerName || group.name;
+
+              allMessages.push({
+                groupName: actualGroupName,
+                groupId: group.id,
+                messages: filteredMessages
+              });
+              totalMessageCount += filteredMessages.length;
+
+              this.infoLog(`群组 "${actualGroupName}" 添加了 ${filteredMessages.length} 条消息`);
+            }
+          } else {
+            this.debugLog(`群组 ${group.name} 没有消息数据`);
+          }
+        } catch (error) {
+          this.errorLog(`获取群组 ${group.name} 消息失败`, error);
+        }
+      }
+
+      this.infoLog(`消息查询完成，总计获得 ${totalMessageCount} 条消息，来自 ${allMessages.length} 个群组`);
+
+      // 格式化输出
+      let output = `聊天记录查询结果\n`;
+      output += `群名关键词: ${groupKeyword}\n`;
+      output += `时间范围: ${timeParam}\n`;
+      if (messageKeyword) {
+        output += `消息过滤: ${messageKeyword}\n`;
+      }
+      output += `${'='.repeat(60)}\n\n`;
+
+      if (allMessages.length > 0) {
+        output += `找到 ${matchedGroups.length} 个群组，其中 ${allMessages.length} 个群组有聊天记录\n`;
+        output += `总消息数: ${totalMessageCount}\n\n`;
+
+        if (groupBy === 'group') {
+          // 按群组分组显示
+          allMessages.forEach((groupData, index) => {
+            output += `${index + 1}. ${groupData.groupName} (${groupData.messages.length} 条消息)\n`;
+            output += `-`.repeat(50) + '\n';
+
+            groupData.messages.forEach(msg => {
+              // 处理时间格式
+              const time = msg.time || (msg.createtime ? new Date(msg.createtime * 1000).toLocaleString('zh-CN') : '未知时间');
+
+              // 获取发送者信息
+              const sender = msg.senderName || msg.sender || '未知';
+              const isSelf = msg.isSelf ? '(我)' : '';
+
+              // 处理消息内容
+              let content = msg.content || '';
+
+              // 处理特殊类型消息
+              if (!content && msg.type) {
+                switch(msg.type) {
+                  case 43: // 视频
+                    content = '[视频]';
+                    if (msg.contents?.path) {
+                      content += ` ${msg.contents.path.split('\\').pop()}`;
+                    }
+                    break;
+                  case 47: // 动画表情
+                    content = '[动画表情]';
+                    break;
+                  case 34: // 语音
+                    content = '[语音消息]';
+                    break;
+                  case 3: // 图片
+                    content = '[图片]';
+                    if (msg.contents?.path) {
+                      const fileName = msg.contents.path.split('\\').pop();
+                      content += ` ${fileName}`;
+                    }
+                    break;
+                  case 49: // 引用/文件/链接/小程序等
+                    if (msg.contents?.refer) {
+                      // 引用消息
+                      const referContent = msg.contents.refer.content || '';
+                      const referSender = msg.contents.refer.senderName || '某人';
+                      content = `[引用 @${referSender}: ${referContent.substring(0, 30)}${referContent.length > 30 ? '...' : ''}]`;
+                    } else if (msg.contents?.title) {
+                      // 文件消息
+                      content = `[文件] ${msg.contents.title}`;
+                    } else {
+                      content = '[链接/小程序]';
+                    }
+                    break;
+                  default:
+                    if (msg.contents) {
+                      content = `[类型${msg.type}]`;
+                    }
+                }
+              }
+
+              output += `[${time}] ${sender}${isSelf}: ${content}\n`;
+            });
+            output += '\n';
+          });
+        } else if (groupBy === 'none') {
+          // 不分组，按时间顺序显示所有消息
+          const flatMessages = [];
+          allMessages.forEach(groupData => {
+            groupData.messages.forEach(msg => {
+              flatMessages.push({
+                ...msg,
+                groupName: groupData.groupName
+              });
+            });
+          });
+
+          // 按时间排序（使用seq或time字段）
+          flatMessages.sort((a, b) => {
+            const aTime = a.seq || new Date(a.time).getTime() || 0;
+            const bTime = b.seq || new Date(b.time).getTime() || 0;
+            return aTime - bTime;
+          });
+
+          flatMessages.forEach(msg => {
+            // 处理时间格式
+            const time = msg.time || (msg.createtime ? new Date(msg.createtime * 1000).toLocaleString('zh-CN') : '未知时间');
+
+            // 获取发送者信息
+            const sender = msg.senderName || msg.sender || '未知';
+            const isSelf = msg.isSelf ? '(我)' : '';
+
+            // 处理消息内容
+            let content = msg.content || '';
+
+            // 处理特殊类型消息
+            if (!content && msg.type) {
+              switch(msg.type) {
+                case 43: // 视频
+                  content = '[视频]';
+                  if (msg.contents?.path) {
+                    content += ` ${msg.contents.path.split('\\').pop()}`;
+                  }
+                  break;
+                case 47: // 动画表情
+                  content = '[动画表情]';
+                  break;
+                case 34: // 语音
+                  content = '[语音消息]';
+                  break;
+                case 3: // 图片
+                  content = '[图片]';
+                  if (msg.contents?.path) {
+                    const fileName = msg.contents.path.split('\\').pop();
+                    content += ` ${fileName}`;
+                  }
+                  break;
+                case 49: // 引用/文件/链接/小程序等
+                  if (msg.contents?.refer) {
+                    // 引用消息
+                    const referContent = msg.contents.refer.content || '';
+                    const referSender = msg.contents.refer.senderName || '某人';
+                    content = `[引用 @${referSender}: ${referContent.substring(0, 30)}${referContent.length > 30 ? '...' : ''}]`;
+                  } else if (msg.contents?.title) {
+                    // 文件消息
+                    content = `[文件] ${msg.contents.title}`;
+                  } else {
+                    content = '[链接/小程序]';
+                  }
+                  break;
+                default:
+                  if (msg.contents) {
+                    content = `[类型${msg.type}]`;
+                  }
+              }
+            }
+
+            output += `[${time}] [${msg.groupName}] ${sender}${isSelf}: ${content}\n`;
+          });
+        }
+      } else {
+        output += '在指定时间范围内未找到聊天记录。\n';
+        output += `\n搜索的群组：\n`;
+        matchedGroups.forEach((group, index) => {
+          output += `${index + 1}. ${group.name} (${group.userCount}人)\n`;
+        });
+      }
+
+      // 清理资源
+      this.debugLog('聊天记录查询完成，清理资源...');
+
+      // 等待所有异步日志写入完成
+      if (this.logStream && this.logStream.pending) {
+        await new Promise(resolve => {
+          this.logStream.once('drain', resolve);
+          // 添加超时防止永久等待
+          setTimeout(resolve, 1000);
+        });
+      }
+
+      // 强制垃圾回收
+      if (global.gc) {
+        global.gc();
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: output
+        }]
+      };
+    } catch (error) {
+      // 清理资源（错误情况下）
+      this.debugLog('聊天记录查询出错，清理资源...');
+      if (this.logStream && this.logStream.pending) {
+        await new Promise(resolve => {
+          this.logStream.once('drain', resolve);
+          setTimeout(resolve, 500);
+        });
+      }
+      if (global.gc) {
+        global.gc();
+      }
+
+      // 如果是404错误，说明API端点不正确
+      if (error.response?.status === 404) {
+        this.errorLog('聊天服务器API端点未找到', error);
+        return {
+          content: [{
+            type: "text",
+            text: `聊天服务器API端点未找到。请确认：\n1. 聊天服务器是否在 ${chatServerUrl} 运行\n2. 确保使用的是正确的API版本 (v1)\n\n错误详情: ${error.message}`
+          }]
+        };
+      }
+
+      this.errorLog('查询聊天记录失败', error);
+      const errorMsg = `查询聊天记录失败: ${error.message}`;
+      throw new Error(errorMsg);
+    }
+  }
+
   // === 日志查询实现 ===
-  
+
   /**
    * 获取日志服务器的基础URL
    */
@@ -2260,12 +2966,12 @@ class ApiTestMCPServer {
     if (this.activeEnvironment?.logServerUrl) {
       return this.activeEnvironment.logServerUrl;
     }
-    
+
     // 如果环境配置中没有，使用baseUrl + 默认日志路径
     if (this.activeEnvironment?.baseUrl) {
       return this.activeEnvironment.baseUrl.replace(/\/api\/?$/, '');
     }
-    
+
     // 最后的默认值
     return 'http://localhost:38181';
   }
@@ -2275,16 +2981,16 @@ class ApiTestMCPServer {
    */
   async handleLogList(args) {
     const logServerUrl = this.getLogServerBaseUrl();
-    
+
     try {
       const response = await axios.get(`${logServerUrl}/api/logs/list`, {
         timeout: 10000
       });
-      
+
       // 格式化输出日志文件列表
       let output = `日志文件列表 (服务器: ${logServerUrl}):\n`;
       output += '='.repeat(60) + '\n';
-      
+
       if (Array.isArray(response.data) && response.data.length > 0) {
         response.data.forEach((file, index) => {
           output += `${index + 1}. ${file.fileName}\n`;
@@ -2296,7 +3002,7 @@ class ApiTestMCPServer {
       } else {
         output += '未找到任何日志文件。\n';
       }
-      
+
       return {
         content: [{
           type: "text",
@@ -2304,7 +3010,7 @@ class ApiTestMCPServer {
         }]
       };
     } catch (error) {
-      const errorMsg = error.response?.status === 404 
+      const errorMsg = error.response?.status === 404
         ? `日志服务器不可用 (${logServerUrl}). 请检查服务器是否启动或环境配置中的logServerUrl是否正确。`
         : `获取日志文件列表失败: ${error.message}`;
       throw new Error(errorMsg);
@@ -2315,19 +3021,19 @@ class ApiTestMCPServer {
    * 处理日志查询
    */
   async handleLogQuery(args) {
-    const { 
-      fileName = 'app.log', 
-      keyword, 
-      level, 
-      startTime, 
-      endTime, 
-      page = 1, 
-      size = 100, 
+    const {
+      fileName = 'app.log',
+      keyword,
+      level,
+      startTime,
+      endTime,
+      page = 1,
+      size = 100,
       regex = false
     } = args;
-    
+
     const logServerUrl = this.getLogServerBaseUrl();
-    
+
     // 构建查询参数
     const queryParams = {
       fileName,
@@ -2335,12 +3041,12 @@ class ApiTestMCPServer {
       size,
       regex
     };
-    
+
     if (keyword) queryParams.keyword = keyword;
     if (level) queryParams.level = level;
     if (startTime) queryParams.startTime = startTime;
     if (endTime) queryParams.endTime = endTime;
-    
+
     try {
       const response = await axios.post(`${logServerUrl}/api/logs/query`, queryParams, {
         headers: {
@@ -2348,7 +3054,7 @@ class ApiTestMCPServer {
         },
         timeout: 30000
       });
-      
+
       // 格式化输出，提供更好的可读性
       const data = response.data;
       let output = `日志查询结果：\n`;
@@ -2357,7 +3063,7 @@ class ApiTestMCPServer {
       output += `页码: ${data.page}/${Math.ceil(data.total / data.size)}\n`;
       output += `每页: ${data.size} 条\n`;
       output += `更多: ${data.hasMore ? '是' : '否'}\n\n`;
-      
+
       if (data.logs && data.logs.length > 0) {
         output += '--- 日志内容 ---\n';
         data.logs.forEach((log, index) => {
@@ -2370,7 +3076,7 @@ class ApiTestMCPServer {
       } else {
         output += '未找到匹配的日志记录。\n';
       }
-      
+
       return {
         content: [{
           type: "text",
@@ -2378,7 +3084,7 @@ class ApiTestMCPServer {
         }]
       };
     } catch (error) {
-      const errorMsg = error.response?.status === 404 
+      const errorMsg = error.response?.status === 404
         ? `日志服务器不可用 (${logServerUrl}). 请检查服务器是否启动或环境配置是否正确。`
         : `日志查询失败: ${error.message}`;
       throw new Error(errorMsg);
@@ -2391,7 +3097,7 @@ class ApiTestMCPServer {
   async handleLogTail(args) {
     const { fileName = 'app.log', lines = 100 } = args;
     const logServerUrl = this.getLogServerBaseUrl();
-    
+
     try {
       const response = await axios.get(`${logServerUrl}/api/logs/tail`, {
         params: {
@@ -2400,10 +3106,10 @@ class ApiTestMCPServer {
         },
         timeout: 10000
       });
-      
+
       let output = `最新 ${lines} 行日志 - ${fileName}:\n`;
       output += '='.repeat(60) + '\n';
-      
+
       if (Array.isArray(response.data) && response.data.length > 0) {
         response.data.forEach((line, index) => {
           output += `${(index + 1).toString().padStart(4, ' ')} | ${line}\n`;
@@ -2411,7 +3117,7 @@ class ApiTestMCPServer {
       } else {
         output += '日志文件为空或不存在。\n';
       }
-      
+
       return {
         content: [{
           type: "text",
@@ -2419,7 +3125,7 @@ class ApiTestMCPServer {
         }]
       };
     } catch (error) {
-      const errorMsg = error.response?.status === 404 
+      const errorMsg = error.response?.status === 404
         ? `日志服务器不可用或日志文件不存在 (${logServerUrl}/${fileName}). 请检查服务器状态和文件名。`
         : `获取日志尾部失败: ${error.message}`;
       throw new Error(errorMsg);
@@ -2432,17 +3138,17 @@ class ApiTestMCPServer {
   async handleLogDownload(args) {
     const { fileName, saveToFile } = args;
     const logServerUrl = this.getLogServerBaseUrl();
-    
+
     try {
       const response = await axios.get(`${logServerUrl}/api/logs/download/${fileName}`, {
         responseType: 'arraybuffer',
         timeout: 60000
       });
-      
+
       if (saveToFile) {
         // 保存到文件
         await fs.writeFile(saveToFile, response.data);
-        
+
         return {
           content: [{
             type: "text",
@@ -2452,11 +3158,11 @@ class ApiTestMCPServer {
       } else {
         // 返回内容（注意：二进制文件可能不适合直接显示）
         const isTextFile = fileName.endsWith('.log') || fileName.endsWith('.txt');
-        
+
         if (isTextFile && response.data.length < 50000) {
           // 如果是文本日志文件且不太大，直接返回内容
           const content = Buffer.from(response.data).toString('utf8');
-          
+
           return {
             content: [{
               type: "text",
@@ -2474,7 +3180,7 @@ class ApiTestMCPServer {
         }
       }
     } catch (error) {
-      const errorMsg = error.response?.status === 404 
+      const errorMsg = error.response?.status === 404
         ? `日志文件不存在 (${fileName}) 或服务器不可用 (${logServerUrl}). 请检查文件名和服务器状态。`
         : `下载日志文件失败: ${error.message}`;
       throw new Error(errorMsg);
@@ -2482,14 +3188,14 @@ class ApiTestMCPServer {
   }
 
   // === 工具函数实现 ===
-  
+
   async handleParseApplicationYml(args) {
     const { filePath } = args;
-    
+
     try {
       const content = await fs.readFile(filePath, 'utf8');
       const config = yaml.parse(content);
-      
+
       // 提取有用的配置信息
       const extracted = {
         server: {
@@ -2504,7 +3210,7 @@ class ApiTestMCPServer {
           swagger: config.springdoc?.['api-docs']?.path || '/v3/api-docs'
         }
       };
-      
+
       return {
         content: [{
           type: "text",
@@ -2520,11 +3226,27 @@ class ApiTestMCPServer {
    * 启动服务器
    */
   async start() {
+    // 初始化日志文件流
+    await this.initializeLogStream();
+
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    
+
+    this.infoLog('MCP服务器启动成功', {
+      debugEnabled: this.enableDebugLog,
+      fileLogEnabled: this.enableFileLog,
+      projectDir: projectDir,
+      dataDir: DATA_DIR,
+      logsDir: LOGS_DIR,
+      activeEnvironment: this.activeEnvironment?.name || 'none'
+    });
+
     // 优雅关闭处理
     process.on('SIGINT', async () => {
+      this.infoLog('MCP服务器正在关闭...');
+      if (this.logStream) {
+        this.logStream.end();
+      }
       await this.server.close();
       process.exit(0);
     });
