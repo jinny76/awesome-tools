@@ -2691,14 +2691,6 @@ ${summary}`
         output = result.message;
       }
 
-      const cacheSummaryText = this.formatCacheSummary(5);
-      if (cacheSummaryText) {
-        output += `
-缓存提示：
-${cacheSummaryText}
-`;
-      }
-
       return {
         content: [{
           type: "text",
