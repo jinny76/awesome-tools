@@ -12,6 +12,7 @@ const { startDatabase } = require('../lib/commands/database');
 const { startAnimationServer } = require('../lib/commands/animation-server');
 const browserToolsCommand = require('../lib/commands/browser-tools');
 const { startDevServer } = require('../lib/commands/dev-server');
+const { runChatScan } = require('../lib/commands/chat-scan');
 const CommandHistory = require('../lib/utils/command-history');
 
 const program = new Command();
@@ -221,6 +222,30 @@ program
   }));
 
 program
+  .command('chat-scan')
+  .description('扫描 Chatlog 群聊活跃度并生成缓存')
+  .option('--project-dir <path>', '项目根目录（默认：当前目录）')
+  .option('--base-url <url>', 'Chatlog 服务地址 (默认: http://127.0.0.1:5030)')
+  .option('--days <number>', '扫描最近的天数 (默认: 365)')
+  .option('--chunk-days <number>', '每次请求覆盖的天数 (默认: 30)')
+  .option('--max-groups <number>', '最多处理的群组数量 (默认: 1000)')
+  .option('--concurrency <number>', '并发请求数量 (默认: 2)')
+  .option('--delay <ms>', '请求间隔，单位毫秒 (默认: 300)')
+  .option('--timeout <ms>', '单次请求超时时间，单位毫秒 (默认: 15000)')
+  .option('--retries <number>', '请求失败后的重试次数 (默认: 2)')
+  .option('--retry-delay <ms>', '重试间隔，单位毫秒 (默认: 800)')
+  .option('--keyword <text>', '按群组名称关键字过滤')
+  .option('--output <path>', '缓存文件输出路径（默认写入 .api-test/chat-cache/groups.json）')
+  .option('--dry-run', '仅预览将要处理的群组，不实际扫描')
+  .action(wrapAction('chat-scan', async (options) => {
+    try {
+      await runChatScan(options);
+    } catch (error) {
+      console.error('执行 Chatlog 群组扫描失败:', error.message);
+      process.exit(1);
+    }
+  }));
+program
   .command('notify')
   .alias('n')
   .description('Server酱消息推送：发送通知到微信等平台')
@@ -388,7 +413,7 @@ function convertToKebabCase(str) {
 function getCommandAlias() {
   return {
     'gs': 'git-stats',
-    'cc': 'clean-code', 
+    'cc': 'clean-code',
     'df': 'debug-file',
     'ff': 'ffmpeg',
     'ss': 'share-server',
@@ -424,7 +449,7 @@ function isNegatedOption(commandName, optionKey) {
     'debug-file': [],
     'ffmpeg': []
   };
-  
+
   return negatedOptions[commandName] && negatedOptions[commandName].includes(optionKey);
 }
 
@@ -435,10 +460,10 @@ async function executeHistoryCommand(commandName, historyIndex) {
     console.error(`❌ 未找到命令编号 ${historyIndex} 的历史记录`);
     process.exit(1);
   }
-  
+
   console.log(`📚 执行历史命令: ${record.command}`);
   console.log(`🕐 执行时间: ${new Date(record.timestamp).toLocaleString('zh-CN')}\n`);
-  
+
   // 直接调用对应的命令函数，而不是重新解析
   try {
     const commandMap = {
@@ -452,7 +477,7 @@ async function executeHistoryCommand(commandName, historyIndex) {
       'database': startDatabase,
       'animation-server': startAnimationServer
     };
-    
+
     const commandFunction = commandMap[commandName];
     if (commandFunction) {
       await commandFunction(record.options);
@@ -472,7 +497,7 @@ async function checkForHistoryMode() {
   if (args.length === 1) {
     const commandName = args[0];
     const validCommands = getAllValidCommands();
-    
+
     if (validCommands.includes(commandName)) {
       // 获取命令全名
       const fullCommandName = getFullCommandName(commandName);
@@ -486,7 +511,7 @@ async function checkForHistoryMode() {
     const commandName = args[0];
     const possibleIndex = args[1];
     const validCommands = getAllValidCommands();
-    
+
     if (validCommands.includes(commandName) && /^\d+$/.test(possibleIndex)) {
       const fullCommandName = getFullCommandName(commandName);
       await executeHistoryCommand(fullCommandName, parseInt(possibleIndex));
@@ -607,7 +632,7 @@ function getCommandConfig(commandName) {
       ]
     }
   };
-  
+
   return configs[commandName] || { description: '未知命令', options: [] };
 }
 
@@ -617,7 +642,7 @@ function wrapAction(commandName, originalAction) {
     // 记录命令执行
     const args = command.args || [];
     commandHistory.recordCommand(commandName, args, options);
-    
+
     // 执行原始action
     return await originalAction(options, command);
   };
@@ -628,7 +653,7 @@ async function main() {
   if (await checkForHistoryMode()) {
     process.exit(0);
   }
-  
+
   program.parse(process.argv);
 }
 

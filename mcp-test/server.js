@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 
 // UTF-8 support for Windows console
 // Note: MCP uses stdio transport, encoding handled by MCP SDK
@@ -42,6 +42,11 @@ const ENVS_FILE = join(DATA_DIR, 'environments.json');
 const SUITES_DIR = join(DATA_DIR, 'suites');
 const RESULTS_DIR = join(DATA_DIR, 'results');
 const SNAPSHOTS_DIR = join(DATA_DIR, 'snapshots');
+const CHAT_CACHE_DIR = join(DATA_DIR, 'chat-cache');
+const CHAT_CACHE_FILE = join(CHAT_CACHE_DIR, 'groups.json');
+const CHAT_CACHE_CHECK_INTERVAL = 30 * 1000; // 30 秒
+const CHAT_SESSION_FETCH_INTERVAL = 60 * 1000; // 60 秒
+
 
 /**
  * API Test MCP Server
@@ -63,6 +68,15 @@ class ApiTestMCPServer {
     this.activeEnvironment = null;
     this.authToken = null;
     this.testContext = new Map(); // 存储测试上下文数据
+    this.chatCachePath = CHAT_CACHE_FILE;
+    this.chatCache = null;
+    this.chatCacheIndex = new Map();
+    this.chatCacheMtime = 0;
+    this.chatCacheLastCheck = 0;
+    this.chatCacheCheckInterval = CHAT_CACHE_CHECK_INTERVAL;
+    this.chatSessionActivity = new Map();
+    this.chatSessionLastFetch = 0;
+    this.chatSessionFetchInterval = CHAT_SESSION_FETCH_INTERVAL;
 
     this.setupToolHandlers();
     this.initializeDataDirectories();
@@ -83,6 +97,9 @@ class ApiTestMCPServer {
       await fs.mkdir(SUITES_DIR, { recursive: true });
       await fs.mkdir(RESULTS_DIR, { recursive: true });
       await fs.mkdir(SNAPSHOTS_DIR, { recursive: true });
+      await fs.mkdir(CHAT_CACHE_DIR, { recursive: true });
+
+      await this.refreshChatCache(true, { includeSession: false }).catch(() => {});
 
       // 初始化环境配置文件
       try {
@@ -124,6 +141,374 @@ class ApiTestMCPServer {
   /**
    * 设置工具处理器
    */
+  /**
+   * 刷新聊天缓存
+   */
+  async refreshChatCache(force = false, { includeSession = true } = {}) {
+    const now = Date.now();
+
+    if (!force && now - this.chatCacheLastCheck < this.chatCacheCheckInterval) {
+      if (includeSession) {
+        await this.refreshSessionActivity(false);
+      }
+      return this.chatCache;
+    }
+
+    this.chatCacheLastCheck = now;
+
+    try {
+      const stat = await fs.stat(this.chatCachePath);
+      if (!this.chatCache || stat.mtimeMs !== this.chatCacheMtime) {
+        const raw = await fs.readFile(this.chatCachePath, 'utf8');
+        const parsed = JSON.parse(raw);
+
+        if (Array.isArray(parsed.groups)) {
+          this.chatCache = parsed;
+          this.chatCacheMtime = stat.mtimeMs;
+          this.chatCacheIndex = new Map();
+          parsed.groups.forEach(group => {
+            if (group && group.id) {
+              this.chatCacheIndex.set(group.id, group);
+            }
+          });
+          console.error(`[ChatCache] 已加载缓存，共 ${parsed.groups.length} 个群组`);
+        } else {
+          console.error('[ChatCache] 缓存文件缺少 groups 字段');
+          this.chatCache = null;
+          this.chatCacheIndex = new Map();
+        }
+      }
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        this.chatCache = null;
+        this.chatCacheIndex = new Map();
+        this.chatCacheMtime = 0;
+      } else {
+        console.error('[ChatCache] 读取缓存失败:', error.message);
+      }
+    }
+
+    if (includeSession) {
+      await this.refreshSessionActivity(force);
+    }
+
+    return this.chatCache;
+  }
+
+  /**
+   * 通过 Chatlog session 接口刷新活跃度
+   */
+  async refreshSessionActivity(force = false) {
+    const now = Date.now();
+
+    if (!force && now - this.chatSessionLastFetch < this.chatSessionFetchInterval) {
+      return this.chatSessionActivity;
+    }
+
+    const chatServerUrl = this.getChatServerBaseUrl();
+    if (!chatServerUrl) {
+      return this.chatSessionActivity;
+    }
+
+    try {
+      const response = await axios.get(`${chatServerUrl}/api/v1/session`, {
+        params: { format: 'json' },
+        timeout: 10000
+      });
+      const sessions = this.normalizeSessionList(response.data);
+      const activityMap = new Map();
+
+      sessions.forEach(session => {
+        const info = this.extractSessionActivity(session);
+        if (info && info.timestamp) {
+          activityMap.set(info.id, info);
+        }
+      });
+
+      this.chatSessionActivity = activityMap;
+      this.chatSessionLastFetch = now;
+
+      if (activityMap.size > 0) {
+        console.error(`[ChatCache] Session 活跃度已刷新 (${activityMap.size} 条记录)`);
+      }
+    } catch (error) {
+      console.error('[ChatCache] 更新 session 活跃度失败:', error.message);
+    }
+
+    return this.chatSessionActivity;
+  }
+
+  normalizeSessionList(data) {
+    if (!data) {
+      return [];
+    }
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (Array.isArray(data.sessions)) {
+      return data.sessions;
+    }
+    if (Array.isArray(data.items)) {
+      return data.items;
+    }
+    if (Array.isArray(data.list)) {
+      return data.list;
+    }
+    if (typeof data === 'object') {
+      return Object.values(data);
+    }
+    return [];
+  }
+
+  extractSessionActivity(session) {
+    if (!session) {
+      return null;
+    }
+    const id = session.talker || session.id || session.name;
+    if (!id) {
+      return null;
+    }
+    const timestamp = this.resolveSessionTimestampValue(session);
+    if (!timestamp) {
+      return null;
+    }
+    const iso = new Date(timestamp).toISOString();
+    const previewSource = session.lastMessage || session.preview || session.summary || '';
+    return {
+      id,
+      name: session.displayName || session.nickname || session.talkerName || id,
+      timestamp,
+      iso,
+      preview: this.truncateText(previewSource, 80),
+      unread: session.unread || session.unreadCount || 0
+    };
+  }
+
+  resolveSessionTimestampValue(session) {
+    const isoFields = [
+      session.lastMessageTime,
+      session.lastTime,
+      session.time,
+      session.lastActive
+    ];
+
+    for (const iso of isoFields) {
+      if (iso) {
+        const parsed = Date.parse(iso);
+        if (!Number.isNaN(parsed)) {
+          return parsed;
+        }
+      }
+    }
+
+    const numericFields = [
+      'timestamp',
+      'lastMessageUnix',
+      'lastMsgTime',
+      'lastMessageTimestamp'
+    ];
+
+    for (const field of numericFields) {
+      const numeric = Number(session[field]);
+      if (Number.isFinite(numeric) && numeric > 0) {
+        return numeric > 1e12 ? numeric : numeric * 1000;
+      }
+    }
+
+    return 0;
+  }
+
+  truncateText(text, maxLength = 80) {
+    if (!text) {
+      return '';
+    }
+    const normalized = String(text).trim().replace(/\s+/g, ' ');
+    if (normalized.length <= maxLength) {
+      return normalized;
+    }
+    return `${normalized.slice(0, maxLength - 3)}...`;
+  }
+
+  getCachedGroupInfo(groupId) {
+    if (!groupId) {
+      return null;
+    }
+    return this.chatCacheIndex.get(groupId) || null;
+  }
+
+  getCacheTimestampFromEntry(entry) {
+    if (!entry) {
+      return 0;
+    }
+    if (entry.lastActive) {
+      const parsed = Date.parse(entry.lastActive);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+    if (entry.lastMessageRawTime) {
+      const numeric = Number(entry.lastMessageRawTime);
+      if (Number.isFinite(numeric) && numeric > 0) {
+        return numeric > 1e12 ? numeric : numeric * 1000;
+      }
+    }
+    if (entry.lastMessage && entry.lastMessage.time) {
+      const parsed = Date.parse(entry.lastMessage.time);
+      if (!Number.isNaN(parsed)) {
+        return parsed;
+      }
+    }
+    return 0;
+  }
+
+  getCacheTimestampForId(groupId) {
+    const cacheEntry = this.getCachedGroupInfo(groupId);
+    const cacheTs = this.getCacheTimestampFromEntry(cacheEntry);
+    const sessionEntry = this.chatSessionActivity.get(groupId);
+    const sessionTs = sessionEntry?.timestamp || 0;
+    return Math.max(cacheTs, sessionTs);
+  }
+
+  prepareGroupCacheHints(groups = []) {
+    const hints = [];
+
+    groups.forEach(group => {
+      const groupId = group?.name || group?.id || group?.talker;
+      const cacheEntry = groupId ? this.getCachedGroupInfo(groupId) : null;
+      const sessionEntry = groupId ? this.chatSessionActivity.get(groupId) : null;
+      const activityTimestamp = groupId ? Math.max(
+        this.getCacheTimestampFromEntry(cacheEntry),
+        sessionEntry?.timestamp || 0
+      ) : 0;
+
+      hints.push({
+        group,
+        groupId,
+        cacheEntry,
+        sessionEntry,
+        activityTimestamp,
+        displayName: cacheEntry?.name || group?.displayName || group?.nickname || groupId || '未知群组'
+      });
+    });
+
+    hints.sort((a, b) => b.activityTimestamp - a.activityTimestamp);
+
+    const hintMap = new Map();
+    hints.forEach(hint => {
+      if (hint.groupId) {
+        hintMap.set(hint.groupId, hint);
+      }
+    });
+
+    return {
+      orderedGroups: hints.map(hint => hint.group),
+      hintMap,
+      hints
+    };
+  }
+
+  getTopCachedGroups(limit = 10) {
+    const merged = new Map();
+
+    this.chatCacheIndex.forEach((entry, id) => {
+      const timestamp = this.getCacheTimestampFromEntry(entry);
+      const iso = entry.lastActive || (timestamp ? new Date(timestamp).toISOString() : null);
+      merged.set(id, {
+        id,
+        name: entry.name || entry.alias || id,
+        timestamp,
+        lastActive: iso,
+        source: 'cache',
+        preview: entry.lastMessage?.preview || null
+      });
+    });
+
+    this.chatSessionActivity.forEach((sessionEntry, id) => {
+      if (!sessionEntry || !sessionEntry.timestamp) {
+        return;
+      }
+      const existing = merged.get(id);
+      if (!existing || sessionEntry.timestamp > existing.timestamp) {
+        merged.set(id, {
+          id,
+          name: sessionEntry.name || existing?.name || id,
+          timestamp: sessionEntry.timestamp,
+          lastActive: sessionEntry.iso,
+          source: existing ? `${existing.source}+session` : 'session',
+          preview: sessionEntry.preview || existing?.preview || null
+        });
+      }
+    });
+
+    const list = Array.from(merged.values()).filter(item => item.timestamp > 0);
+    list.sort((a, b) => b.timestamp - a.timestamp);
+    return list.slice(0, limit);
+  }
+
+  formatCacheSummary(limit = 5) {
+    const top = this.getTopCachedGroups(limit);
+    if (top.length === 0) {
+      return '缓存中没有可用的群组活跃信息。';
+    }
+
+    let text = `缓存中最近活跃的群组（前 ${top.length} 个）：`;
+    top.forEach((item, index) => {
+      text += `
+${index + 1}. ${item.name} (${item.id})`;
+      text += `
+   最近活跃: ${item.lastActive || '未知'}`;
+      text += `
+   来源: ${item.source}`;
+      if (item.preview) {
+        text += `
+   摘要: ${this.truncateText(item.preview, 60)}`;
+      }
+    });
+
+    return text;
+  }
+
+  async handleChatCacheRefresh(args = {}) {
+    const force = Boolean(args.force);
+    const includeSession = args.includeSession !== false;
+
+    if (includeSession) {
+      this.chatSessionLastFetch = 0;
+    }
+
+    const cache = await this.refreshChatCache(force, { includeSession });
+    const cacheCount = cache?.groups?.length || 0;
+    const sessionCount = this.chatSessionActivity?.size || 0;
+    const summary = this.formatCacheSummary(5);
+
+    return {
+      content: [{
+        type: 'text',
+        text: `缓存文件: ${this.chatCachePath}
+缓存群组: ${cacheCount}
+session 活跃记录: ${sessionCount}
+
+${summary}`
+      }]
+    };
+  }
+
+  async handleChatCacheTop(args = {}) {
+    const limit = Number.isFinite(Number(args.limit)) && Number(args.limit) > 0
+      ? Number(args.limit)
+      : 10;
+
+    await this.refreshChatCache(false, { includeSession: true });
+    const summary = this.formatCacheSummary(limit);
+
+    return {
+      content: [{
+        type: 'text',
+        text: summary
+      }]
+    };
+  }
+
   setupToolHandlers() {
     // 注册工具列表处理器
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
@@ -608,37 +993,59 @@ class ApiTestMCPServer {
             }
           },
 
-          // === 聊天记录查询 ===
+          // === 聊天缓存工具 ===
           {
-            name: "chat_group_messages",
-            description: "微信群消息汇总, 查询群名包含指定关键词的所有群组在指定时间范围内的全部聊天记录",
+            name: "chat_cache_refresh",
+            description: "重新加载 Chatlog 群组缓存，可选刷新 session 活跃度",
             inputSchema: {
               type: "object",
               properties: {
-                groupKeyword: {
-                  type: "string",
-                  description: "群名关键词（必填，如：'翠鸟' 将匹配所有包含'翠鸟'的群）"
+                force: {
+                  type: "boolean",
+                  description: "是否强制重新读取缓存文件"
                 },
-                startTime: {
-                  type: "string",
-                  description: "开始时间（ISO格式：2024-01-18T00:00:00 或日期格式：2024-01-18）, 如果传入日期, 则开始日期需要是查询范围前一天, 比如2024-01-18指的是查2024-01-19开始的消息"
-                },
-                endTime: {
-                  type: "string",
-                  description: "结束时间（ISO格式：2024-01-18T23:59:59 或日期格式：2024-01-18）"
-                },
-                messageKeyword: {
-                  type: "string",
-                  description: "消息内容关键词过滤（可选，用于进一步过滤聊天记录）"
-                },
-                groupBy: {
-                  type: "string",
-                  enum: ["none", "group", "time"],
-                  description: "分组方式（none=不分组，group=按群组分组，time=按时间分组）",
-                  default: "group"
+                includeSession: {
+                  type: "boolean",
+                  description: "是否同时刷新 session 活跃度（默认 true）",
+                  default: true
                 }
-              },
-              required: ["groupKeyword"]
+              }
+            }
+          },
+          {
+            name: "chat_cache_top",
+            description: "查看缓存中最近活跃的群组列表",
+            inputSchema: {
+              type: "object",
+              properties: {
+                limit: {
+                  type: "integer",
+                  description: "返回的群组数量",
+                  default: 10
+                }
+              }
+            }
+          },
+
+          // === 聊天群组查询 ===
+          {
+            name: "chat_active_groups",
+            description: "查询微信群组，支持关键字过滤和数量限制",
+            inputSchema: {
+              type: "object",
+              properties: {
+                keyword: {
+                  type: "string",
+                  description: "群名关键词过滤（可选，如：'翠鸟' 将匹配所有包含'翠鸟'的群）"
+                },
+                limit: {
+                  type: "integer",
+                  description: "返回群组数量限制（默认10，最大50）",
+                  default: 10,
+                  minimum: 1,
+                  maximum: 50
+                }
+              }
             }
           },
 
@@ -830,8 +1237,12 @@ class ApiTestMCPServer {
             return await this.handleExecuteQuery(args);
 
           // 聊天记录查询
-          case "chat_group_messages":
-            return await this.handleChatGroupMessages(args);
+          case "chat_cache_refresh":
+            return await this.handleChatCacheRefresh(args);
+          case "chat_cache_top":
+            return await this.handleChatCacheTop(args);
+          case "chat_active_groups":
+            return await this.handleChatActiveGroups(args);
 
           // 日志查询
           case "log_list":
@@ -2280,6 +2691,14 @@ class ApiTestMCPServer {
         output = result.message;
       }
 
+      const cacheSummaryText = this.formatCacheSummary(5);
+      if (cacheSummaryText) {
+        output += `
+缓存提示：
+${cacheSummaryText}
+`;
+      }
+
       return {
         content: [{
           type: "text",
@@ -2301,7 +2720,6 @@ class ApiTestMCPServer {
    * 获取聊天服务器的基础URL
    */
   getChatServerBaseUrl() {
-    // 聊天服务器固定地址
     return 'http://127.0.0.1:5030';
   }
 
@@ -2352,440 +2770,6 @@ class ApiTestMCPServer {
     throw lastError;
   }
 
-  /**
-   * 处理聊天记录查询
-   */
-  async handleChatGroupMessages(args) {
-    console.error('[DEBUG] 开始处理聊天记录查询请求');
-    console.error('[DEBUG] 接收到的参数:', JSON.stringify(args));
-
-    const {
-      groupKeyword,
-      startTime,
-      endTime,
-      messageKeyword,
-      groupBy = 'group'
-    } = args;
-    
-    console.error('[DEBUG] 解析后的groupKeyword:', groupKeyword);
-
-    if (!groupKeyword) {
-      const error = '群名关键词是必需的参数';
-      throw new Error(error);
-    }
-
-    const chatServerUrl = this.getChatServerBaseUrl();
-    console.error('[DEBUG] 聊天服务器URL:', chatServerUrl);
-
-    try {
-      console.error('[DEBUG] 开始处理时间参数');
-      // 处理时间参数
-      let timeParam = '';
-
-      if (startTime && endTime) {
-        // 如果提供了开始和结束时间，使用范围格式
-        const start = startTime.includes('T') ? startTime.split('T')[0] : startTime;
-        const end = endTime.includes('T') ? endTime.split('T')[0] : endTime;
-        timeParam = `${start}~${end}`;
-      } else if (startTime) {
-        // 只有开始时间
-        timeParam = startTime.includes('T') ? startTime.split('T')[0] : startTime;
-      } else if (endTime) {
-        // 只有结束时间
-        timeParam = endTime.includes('T') ? endTime.split('T')[0] : endTime;
-      } else {
-        // 没有提供时间，默认查询今天
-        const today = new Date().toISOString().split('T')[0];
-        timeParam = today;
-      }
-
-      console.error('[DEBUG] 时间参数处理完成:', timeParam);
-      console.error('[DEBUG] 开始获取群聊列表');
-
-      // 首先获取群聊列表，筛选出包含关键词的群
-      const chatroomResponse = await this.fetchWithRetry(`${chatServerUrl}/api/v1/chatroom`, {
-        params: {
-          format: 'json',
-          keyword: groupKeyword  // API支持关键字参数直接过滤
-        },
-        timeout: 10000,
-        headers: {
-          'User-Agent': 'MCP-ChatQuery/1.0'
-        }
-      }, 3, '群聊列表');
-
-      console.error('[DEBUG] 群聊列表请求完成');
-      const chatroomsData = chatroomResponse.data;
-      const matchedGroups = [];
-
-      // 处理API返回的数据格式 {items: [...]}
-      const chatrooms = chatroomsData.items || chatroomsData;
-
-      if (Array.isArray(chatrooms)) {
-        chatrooms.forEach(room => {
-          // 注意：API返回的群组ID字段是 "name" (如: 10289073030@chatroom)
-          // displayName可能为空，需要从其他地方获取群名
-          const groupId = room.name;
-          const displayName = room.displayName || room.nickname || '';
-
-          // 如果没有显示名称，使用群ID的简化形式
-          const groupName = displayName || `群组(${groupId.split('@')[0]})`;
-
-          matchedGroups.push({
-            id: groupId,
-            name: groupName,
-            owner: room.owner,
-            userCount: room.users ? room.users.length : 0
-          });
-        });
-      }
-
-
-      if (matchedGroups.length === 0) {
-        return {
-          content: [{
-            type: "text",
-            text: `未找到群名包含 "${groupKeyword}" 的群组。`
-          }]
-        };
-      }
-
-      // 对每个匹配的群组查询聊天记录
-      const allMessages = [];
-      let totalMessageCount = 0;
-
-
-      for (let i = 0; i < matchedGroups.length; i++) {
-        const group = matchedGroups[i];
-        
-        try {
-
-          // 构建查询参数
-          const params = {
-            time: timeParam,
-            talker: group.id,
-            format: 'json'
-          };
-
-
-          // 添加重试机制 - 使用与浏览器完全一致的请求方式
-          const messagesResponse = await this.fetchWithRetry(`${chatServerUrl}/api/v1/chatlog`, {
-            params: params,
-            timeout: 30000,
-            headers: {
-              'Accept': '*/*',
-              'Accept-Encoding': 'gzip, deflate, br',
-              'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-              'Cache-Control': 'no-cache',
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0',
-              'Sec-Fetch-Dest': 'empty',
-              'Sec-Fetch-Mode': 'cors',
-              'Sec-Fetch-Site': 'same-origin'
-            },
-            responseType: 'text'
-          }, 3, group.name);
-
-          // 解析JSON响应
-          let messages;
-          try {
-
-            messages = JSON.parse(messagesResponse.data);
-
-            if (Array.isArray(messages)) {
-            } else if (typeof messages === 'object') {
-            }
-          } catch (jsonError) {
-            continue;
-          }
-
-          // 如果响应是类似数组的对象（键为数字字符串），转换为真正的数组
-          if (messages && typeof messages === 'object' && !Array.isArray(messages)) {
-            const keys = Object.keys(messages);
-            if (keys.length > 0 && keys.every(key => /^\d+$/.test(key))) {
-              messages = Object.values(messages);
-            }
-          }
-
-
-          if (Array.isArray(messages) && messages.length > 0) {
-            // 如果有消息关键词过滤
-            const startFilterTime = Date.now();
-            const filteredMessages = messageKeyword
-              ? messages.filter((msg, index) => {
-                  // 每100条消息输出一次进度日志
-                  if (index > 0 && index % 100 === 0) {
-                  }
-
-                  // 构建可搜索的文本内容
-                  let searchableContent = msg.content || '';
-
-                  // 根据消息类型添加可搜索的文本
-                  if (msg.type) {
-                    switch(msg.type) {
-                      case 43: // 视频
-                        searchableContent += ' 视频 video';
-                        if (msg.contents?.path) {
-                          searchableContent += ' ' + msg.contents.path;
-                        }
-                        break;
-                      case 47: // 动画表情
-                        searchableContent += ' 动画表情 表情 emoji';
-                        break;
-                      case 34: // 语音
-                        searchableContent += ' 语音 音频 voice';
-                        break;
-                      case 3: // 图片
-                        searchableContent += ' 图片 图像 image';
-                        if (msg.contents?.path) {
-                          searchableContent += ' ' + msg.contents.path;
-                        }
-                        if (msg.contents?.md5) {
-                          searchableContent += ' ' + msg.contents.md5;
-                        }
-                        break;
-                      case 49: // 引用/文件/链接/小程序等
-                        // 检查是否是引用消息
-                        if (msg.contents?.refer) {
-                          searchableContent += ' 引用 回复 reply';
-                          // 添加被引用的消息内容
-                          if (msg.contents.refer.content) {
-                            searchableContent += ' ' + msg.contents.refer.content;
-                          }
-                          if (msg.contents.refer.senderName) {
-                            searchableContent += ' ' + msg.contents.refer.senderName;
-                          }
-                        } else if (msg.contents?.title) {
-                          // 文件消息
-                          searchableContent += ' 文件 file';
-                          searchableContent += ' ' + msg.contents.title;
-                          if (msg.contents.md5) {
-                            searchableContent += ' ' + msg.contents.md5;
-                          }
-                        } else {
-                          // 其他类型（链接、小程序等）
-                          searchableContent += ' 链接 小程序 link miniprogram';
-                        }
-                        break;
-                    }
-                  }
-
-                  // 添加发送者信息到搜索内容
-                  if (msg.senderName) searchableContent += ' ' + msg.senderName;
-                  if (msg.sender) searchableContent += ' ' + msg.sender;
-
-                  // 添加contents内容到搜索
-                  if (msg.contents && typeof msg.contents === 'object') {
-                    searchableContent += ' ' + JSON.stringify(msg.contents);
-                  }
-
-                  // 检查是否包含关键词（不区分大小写）
-                  return searchableContent.toLowerCase().includes(messageKeyword.toLowerCase());
-                })
-              : messages;
-
-            if (filteredMessages.length > 0) {
-              // 注意：API返回的talkerName可能就是群名
-              const actualGroupName = messages[0]?.talkerName || group.name;
-
-              allMessages.push({
-                groupName: actualGroupName,
-                groupId: group.id,
-                messages: filteredMessages
-              });
-              totalMessageCount += filteredMessages.length;
-
-            }
-          } else {
-          }
-        } catch (error) {
-        }
-      }
-
-
-      // 格式化输出
-      let output = `聊天记录查询结果\n`;
-      output += `群名关键词: ${groupKeyword}\n`;
-      output += `时间范围: ${timeParam}\n`;
-      if (messageKeyword) {
-        output += `消息过滤: ${messageKeyword}\n`;
-      }
-      output += `${'='.repeat(60)}\n\n`;
-
-      if (allMessages.length > 0) {
-        output += `找到 ${matchedGroups.length} 个群组，其中 ${allMessages.length} 个群组有聊天记录\n`;
-        output += `总消息数: ${totalMessageCount}\n\n`;
-
-        if (groupBy === 'group') {
-          // 按群组分组显示
-          allMessages.forEach((groupData, index) => {
-            output += `${index + 1}. ${groupData.groupName} (${groupData.messages.length} 条消息)\n`;
-            output += `-`.repeat(50) + '\n';
-
-            groupData.messages.forEach(msg => {
-              // 处理时间格式
-              const time = msg.time || (msg.createtime ? new Date(msg.createtime * 1000).toLocaleString('zh-CN') : '未知时间');
-
-              // 获取发送者信息
-              const sender = msg.senderName || msg.sender || '未知';
-              const isSelf = msg.isSelf ? '(我)' : '';
-
-              // 处理消息内容
-              let content = msg.content || '';
-
-              // 处理特殊类型消息
-              if (!content && msg.type) {
-                switch(msg.type) {
-                  case 43: // 视频
-                    content = '[视频]';
-                    if (msg.contents?.path) {
-                      content += ` ${msg.contents.path.split('\\').pop()}`;
-                    }
-                    break;
-                  case 47: // 动画表情
-                    content = '[动画表情]';
-                    break;
-                  case 34: // 语音
-                    content = '[语音消息]';
-                    break;
-                  case 3: // 图片
-                    content = '[图片]';
-                    if (msg.contents?.path) {
-                      const fileName = msg.contents.path.split('\\').pop();
-                      content += ` ${fileName}`;
-                    }
-                    break;
-                  case 49: // 引用/文件/链接/小程序等
-                    if (msg.contents?.refer) {
-                      // 引用消息
-                      const referContent = msg.contents.refer.content || '';
-                      const referSender = msg.contents.refer.senderName || '某人';
-                      content = `[引用 @${referSender}: ${referContent.substring(0, 30)}${referContent.length > 30 ? '...' : ''}]`;
-                    } else if (msg.contents?.title) {
-                      // 文件消息
-                      content = `[文件] ${msg.contents.title}`;
-                    } else {
-                      content = '[链接/小程序]';
-                    }
-                    break;
-                  default:
-                    if (msg.contents) {
-                      content = `[类型${msg.type}]`;
-                    }
-                }
-              }
-
-              output += `[${time}] ${sender}${isSelf}: ${content}\n`;
-            });
-            output += '\n';
-          });
-        } else if (groupBy === 'none') {
-          // 不分组，按时间顺序显示所有消息
-          const flatMessages = [];
-          allMessages.forEach(groupData => {
-            groupData.messages.forEach(msg => {
-              flatMessages.push({
-                ...msg,
-                groupName: groupData.groupName
-              });
-            });
-          });
-
-          // 按时间排序（使用seq或time字段）
-          flatMessages.sort((a, b) => {
-            const aTime = a.seq || new Date(a.time).getTime() || 0;
-            const bTime = b.seq || new Date(b.time).getTime() || 0;
-            return aTime - bTime;
-          });
-
-          flatMessages.forEach(msg => {
-            // 处理时间格式
-            const time = msg.time || (msg.createtime ? new Date(msg.createtime * 1000).toLocaleString('zh-CN') : '未知时间');
-
-            // 获取发送者信息
-            const sender = msg.senderName || msg.sender || '未知';
-            const isSelf = msg.isSelf ? '(我)' : '';
-
-            // 处理消息内容
-            let content = msg.content || '';
-
-            // 处理特殊类型消息
-            if (!content && msg.type) {
-              switch(msg.type) {
-                case 43: // 视频
-                  content = '[视频]';
-                  if (msg.contents?.path) {
-                    content += ` ${msg.contents.path.split('\\').pop()}`;
-                  }
-                  break;
-                case 47: // 动画表情
-                  content = '[动画表情]';
-                  break;
-                case 34: // 语音
-                  content = '[语音消息]';
-                  break;
-                case 3: // 图片
-                  content = '[图片]';
-                  if (msg.contents?.path) {
-                    const fileName = msg.contents.path.split('\\').pop();
-                    content += ` ${fileName}`;
-                  }
-                  break;
-                case 49: // 引用/文件/链接/小程序等
-                  if (msg.contents?.refer) {
-                    // 引用消息
-                    const referContent = msg.contents.refer.content || '';
-                    const referSender = msg.contents.refer.senderName || '某人';
-                    content = `[引用 @${referSender}: ${referContent.substring(0, 30)}${referContent.length > 30 ? '...' : ''}]`;
-                  } else if (msg.contents?.title) {
-                    // 文件消息
-                    content = `[文件] ${msg.contents.title}`;
-                  } else {
-                    content = '[链接/小程序]';
-                  }
-                  break;
-                default:
-                  if (msg.contents) {
-                    content = `[类型${msg.type}]`;
-                  }
-              }
-            }
-
-            output += `[${time}] [${msg.groupName}] ${sender}${isSelf}: ${content}\n`;
-          });
-        }
-      } else {
-        output += '在指定时间范围内未找到聊天记录。\n';
-        output += `\n搜索的群组：\n`;
-        matchedGroups.forEach((group, index) => {
-          output += `${index + 1}. ${group.name} (${group.userCount}人)\n`;
-        });
-      }
-
-
-      return {
-        content: [{
-          type: "text",
-          text: output
-        }]
-      };
-    } catch (error) {
-      // 错误处理
-
-      // 如果是404错误，说明API端点不正确
-      if (error.response?.status === 404) {
-        return {
-          content: [{
-            type: "text",
-            text: `聊天服务器API端点未找到。请确认：\n1. 聊天服务器是否在 ${chatServerUrl} 运行\n2. 确保使用的是正确的API版本 (v1)\n\n错误详情: ${error.message}`
-          }]
-        };
-      }
-
-      const errorMsg = `查询聊天记录失败: ${error.message}`;
-      throw new Error(errorMsg);
-    }
-  }
-
   // === 日志查询实现 ===
 
   /**
@@ -2804,6 +2788,123 @@ class ApiTestMCPServer {
 
     // 最后的默认值
     return 'http://localhost:38181';
+  }
+
+  /**
+   * 处理查询最近活动的微信群组 - 基于缓存数据
+   */
+  async handleChatActiveGroups(args) {
+    console.error('[DEBUG] 开始处理活动群组查询请求');
+    console.error('[DEBUG] 接收到的参数:', JSON.stringify(args));
+
+    const {
+      keyword = '',
+      limit = 10
+    } = args;
+    
+    // 验证limit参数
+    const actualLimit = Math.max(1, Math.min(50, limit));
+    console.error(`[DEBUG] 使用limit: ${actualLimit}`);
+
+    // 刷新缓存（包括session数据）
+    await this.refreshChatCache(false, { includeSession: true });
+
+    console.error('[DEBUG] 开始从缓存获取群组数据');
+    
+    // 从缓存中获取所有群组数据
+    let allGroups = [];
+    if (this.chatCache && this.chatCache.groups && Array.isArray(this.chatCache.groups)) {
+      allGroups = this.chatCache.groups.map(room => ({
+        id: room.name || room.id,
+        name: room.nickName || room.displayName || room.nickname || `群组(${(room.name || room.id).split('@')[0]})`,
+        owner: room.owner || '未知',
+        userCount: room.users ? room.users.length : 0,
+        remark: room.remark || '',
+        lastMessageTime: room.lastActive || room.lastMessageRawTime || room.lastMessage?.time || null,
+        lastMessagePreview: room.lastMessage?.preview || null,
+        senderName: room.lastMessage?.senderName || null
+      }));
+    }
+
+    console.error(`[DEBUG] 从缓存获取到 ${allGroups.length} 个群聊`);
+
+    // 关键词过滤
+    let filteredGroups = allGroups;
+    if (keyword && keyword.trim()) {
+      const searchKeyword = keyword.trim().toLowerCase();
+      filteredGroups = allGroups.filter(group => 
+        group.name.toLowerCase().includes(searchKeyword) ||
+        group.id.toLowerCase().includes(searchKeyword) ||
+        (group.remark && group.remark.toLowerCase().includes(searchKeyword))
+      );
+      console.error(`[DEBUG] 关键词"${keyword}"过滤后找到 ${filteredGroups.length} 个群聊`);
+    }
+
+    // 按最后消息时间排序（有聊天记录的在前面）
+    let sortedGroups = [...filteredGroups].sort((a, b) => {
+      const aTime = a.lastMessageTime;
+      const bTime = b.lastMessageTime;
+      
+      // 如果一个有时间，另一个没有，有时间的排在前面
+      if (aTime && !bTime) return -1;
+      if (!aTime && bTime) return 1;
+      
+      // 如果都没有时间，保持原顺序
+      if (!aTime && !bTime) return 0;
+      
+      // 如果都有时间，按时间倒序排列（最新的在前）
+      return new Date(bTime) - new Date(aTime);
+    });
+
+    console.error(`[DEBUG] 排序后共有 ${sortedGroups.length} 个群聊`);
+
+    // 限制返回数量
+    const resultGroups = sortedGroups.slice(0, actualLimit);
+
+    // 格式化输出
+    let output = `微信群组列表\n`;
+    if (keyword) {
+      output += `关键词过滤: ${keyword}\n`;
+    }
+    output += `返回数量: ${resultGroups.length}/${sortedGroups.length}\n`;
+    output += `${'='.repeat(60)}\n\n`;
+
+    if (resultGroups.length === 0) {
+      output += '没有找到符合条件的群组。\n';
+    } else {
+      resultGroups.forEach((group, index) => {
+        output += `${index + 1}. ${group.name}\n`;
+        output += `   群组ID: ${group.id}\n`;
+        output += `   成员数: ${group.userCount}\n`;
+        output += `   群主: ${group.owner || '未知'}\n`;
+        
+        if (group.remark) {
+          output += `   备注: ${group.remark}\n`;
+        }
+        
+        if (group.lastMessageTime) {
+          const lastTime = new Date(group.lastMessageTime);
+          output += `   最后消息时间: ${lastTime.toLocaleString('zh-CN')}\n`;
+          
+          if (group.senderName) {
+            output += `   最后发言人: ${group.senderName}\n`;
+          }
+          
+          if (group.lastMessagePreview) {
+            output += `   最后消息: ${group.lastMessagePreview}\n`;
+          }
+        }
+        
+        output += '\n';
+      });
+    }
+
+    return {
+      content: [{
+        type: "text",
+        text: output
+      }]
+    };
   }
 
   /**
